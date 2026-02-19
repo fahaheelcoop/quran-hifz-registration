@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تم التسجيل</title>
+<style>
+  body{font-family:Arial,sans-serif;background:#f6f7fb;margin:0;padding:30px}
+  .card{max-width:760px;margin:auto;background:#fff;padding:22px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+  h2{text-align:center;margin:0 0 14px}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{border-bottom:1px solid #eee;padding:10px;text-align:right}
+  th{background:#fafafa}
+  .btn{display:inline-block;margin-top:16px;background:#2e7d32;color:#fff;padding:12px 14px;border-radius:12px;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>تم التسجيل بنجاح ✅</h2>
+  <div id="box"></div>
+  <a class="btn" href="index.html">رجوع لصفحة التحقق</a>
+</div>
+
+<script>
+function safeJson(str){
+  try{ return JSON.parse(str); }catch(e){ return []; }
+}
+const q = new URLSearchParams(window.location.search);
+const itemsStr = q.get('items') ? decodeURIComponent(q.get('items')) : '[]';
+const items = safeJson(itemsStr);
+
+const box = document.getElementById('box');
+
+if(!items.length){
+  box.innerHTML = "<p>تم اعتماد مشاركتك.</p>";
+}else{
+  let html = `
+    <p style="text-align:center;color:#555;margin:0">أرقام المتسابقين المسجلة:</p>
+    <table>
+      <thead>
+        <tr>
+          <th>الرقم المسلسل</th>
+          <th>اسم المتسابق</th>
+          <th>المرحلة</th>
+          <th>النوع</th>
+          <th>Reg ID</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  for(const it of items){
+    html += `
+      <tr>
+        <td>${it.serial_no || ''}</td>
+        <td>${it.child_name || ''}</td>
+        <td>${it.stage || ''}</td>
+        <td>${it.gender || ''}</td>
+        <td style="direction:ltr;text-align:left">${it.reg_id || ''}</td>
+      </tr>
+    `;
+  }
+  html += `</tbody></table>`;
+  box.innerHTML = html;
+}
+</script>
+</body>
+</html>
