@@ -159,23 +159,91 @@ async function fileToDataUrl(file){
   const MAX_SIZE = 3 * 1024 * 1024; // 3MB
 
   if(!file) throw new Error("لم يتم اختيار صورة.");
+  if(!String(file.type || '').startsWith('image/')) throw new Error("الملف المختار لازم يكون صورة.");
 
-  // تأكيد أنها صورة
-  if(!String(file.type || '').startsWith('image/')){
-    throw new Error("الملف المختار لازم يكون صورة.");
+  // لو صغيرة، رجّعها مباشرة بدون ضغط
+  if(file.size <= MAX_SIZE){
+    return await readAsDataURL_(file);
   }
 
-  if(file.size > MAX_SIZE){
-    throw new Error("حجم الصورة يجب ألا يتجاوز 3 ميجا.");
+  // لو كبيرة: اضغطها تلقائيًا
+  const compressedBlob = await compressImageToUnderLimit_(file, MAX_SIZE);
+
+  // (لو ماقدرش ينزلها تحت الحد لأي سبب)
+  if(compressedBlob.size > MAX_SIZE){
+    throw new Error("تعذر ضغط الصورة تحت 3 ميجا. جرّب صورة أوضح/أقل حجمًا.");
   }
 
+  return await readAsDataURL_(compressedBlob);
+}
+
+function readAsDataURL_(blob){
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(String(r.result || ''));
     r.onerror = reject;
-    r.readAsDataURL(file);
+    r.readAsDataURL(blob);
   });
 }
+
+async function compressImageToUnderLimit_(file, maxBytes){
+  // نقرأ الصورة كـ Image
+  const img = await loadImage_(file);
+
+  // إعدادات الضغط (قابلة للتعديل)
+  let maxDim = 1600;     // أقصى بُعد (عرض/ارتفاع)
+  let quality = 0.82;    // جودة JPEG
+  let blob = await canvasCompress_(img, maxDim, quality);
+
+  // لو لسه كبيرة: قلل الجودة تدريجيًا
+  while(blob.size > maxBytes && quality > 0.45){
+    quality -= 0.08;
+    blob = await canvasCompress_(img, maxDim, quality);
+  }
+
+  // لو لسه كبيرة: صغّر الأبعاد تدريجيًا + زوّد ضغط
+  while(blob.size > maxBytes && maxDim > 900){
+    maxDim -= 200;
+    quality = Math.max(0.5, quality); // خليك في جودة معقولة
+    blob = await canvasCompress_(img, maxDim, quality);
+  }
+
+  return blob;
+}
+
+function loadImage_(file){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
+
+function canvasCompress_(img, maxDim, quality){
+  return new Promise((resolve) => {
+    let { width, height } = img;
+
+    // حفظ النسبة
+    const scale = Math.min(1, maxDim / Math.max(width, height));
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, width, height);
+
+    // نحول إلى JPEG لتقليل الحجم
+    canvas.toBlob((blob) => {
+      resolve(blob || file);
+    }, 'image/jpeg', quality);
+  });
+}
+
 
 function setMsg(text, ok){
   const m = document.getElementById('msg');
@@ -248,13 +316,14 @@ function showFileSize(input, labelId){
 
   const sizeText = formatBytes(file.size);
 
-  if(file.size > MAX_SIZE){
-    el.textContent = `حجم الصورة: ${sizeText} (أكبر من 3 ميجا ❌)`;
-    el.className = "hint bad";
-  }else{
-    el.textContent = `حجم الصورة: ${sizeText} ✅`;
-    el.className = "hint";
-  }
+if(file.size > MAX_SIZE){
+  el.textContent = `حجم الصورة: ${sizeText} — سيتم ضغطها تلقائيًا قبل الإرسال ✅`;
+  el.className = "hint";
+}else{
+  el.textContent = `حجم الصورة: ${sizeText} ✅`;
+  el.className = "hint";
+}
+
 
   refreshSubmitState();   // 👈 مهم
 }
