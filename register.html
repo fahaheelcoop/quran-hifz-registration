@@ -30,8 +30,8 @@
   .msg{margin-top:12px;text-align:center;font-weight:700}
   .err{color:#b00020}
   .ok{color:#1b5e20}
- .hint{font-size:12px;color:#666;margin-top:6px}
-.hint.bad{color:#b00020;font-weight:700}
+  .hint{font-size:12px;color:#666;margin-top:6px}
+  .hint.bad{color:#b00020;font-weight:700}
 </style>
 </head>
 <body>
@@ -58,8 +58,7 @@
       <div>
         <label>صورة البطاقة المدنية (ولي الأمر)</label>
         <input id="guardian_id_img" type="file" accept="image/*" onchange="showFileSize(this, 'guardian_size')" />
-<div class="hint" id="guardian_size">لم يتم اختيار صورة بعد</div>
-
+        <div class="hint" id="guardian_size">لم يتم اختيار صورة بعد</div>
       </div>
 
       <div class="full">
@@ -134,8 +133,7 @@ function childTemplate(i){
         <div class="full">
           <label>صورة البطاقة المدنية (المتسابق)</label>
           <input id="child_id_img_${i}" type="file" accept="image/*" onchange="showFileSize(this, 'child_size_${i}')" />
-<div class="hint" id="child_size_${i}">لم يتم اختيار صورة بعد</div>
-
+          <div class="hint" id="child_size_${i}">لم يتم اختيار صورة بعد</div>
         </div>
       </div>
     </div>
@@ -146,35 +144,13 @@ function addChild(){
   const wrap = document.getElementById('childrenWrap');
   wrap.insertAdjacentHTML('beforeend', childTemplate(childIndex));
   childIndex++;
- refreshSubmitState();
+  refreshSubmitState();
 }
 
 function removeChild(i){
   const el = document.getElementById('child_' + i);
   if(el) el.remove();
- refreshSubmitState();
-}
-
-async function fileToDataUrl(file){
-  const MAX_SIZE = 3 * 1024 * 1024; // 3MB
-
-  if(!file) throw new Error("لم يتم اختيار صورة.");
-  if(!String(file.type || '').startsWith('image/')) throw new Error("الملف المختار لازم يكون صورة.");
-
-  // لو صغيرة، رجّعها مباشرة بدون ضغط
-  if(file.size <= MAX_SIZE){
-    return await readAsDataURL_(file);
-  }
-
-  // لو كبيرة: اضغطها تلقائيًا
-  const compressedBlob = await compressImageToUnderLimit_(file, MAX_SIZE);
-
-  // (لو ماقدرش ينزلها تحت الحد لأي سبب)
-  if(compressedBlob.size > MAX_SIZE){
-    throw new Error("تعذر ضغط الصورة تحت 3 ميجا. جرّب صورة أوضح/أقل حجمًا.");
-  }
-
-  return await readAsDataURL_(compressedBlob);
+  refreshSubmitState();
 }
 
 function readAsDataURL_(blob){
@@ -184,31 +160,6 @@ function readAsDataURL_(blob){
     r.onerror = reject;
     r.readAsDataURL(blob);
   });
-}
-
-async function compressImageToUnderLimit_(file, maxBytes){
-  // نقرأ الصورة كـ Image
-  const img = await loadImage_(file);
-
-  // إعدادات الضغط (قابلة للتعديل)
-  let maxDim = 1600;     // أقصى بُعد (عرض/ارتفاع)
-  let quality = 0.82;    // جودة JPEG
-  let blob = await canvasCompress_(img, maxDim, quality);
-
-  // لو لسه كبيرة: قلل الجودة تدريجيًا
-  while(blob.size > maxBytes && quality > 0.45){
-    quality -= 0.08;
-    blob = await canvasCompress_(img, maxDim, quality);
-  }
-
-  // لو لسه كبيرة: صغّر الأبعاد تدريجيًا + زوّد ضغط
-  while(blob.size > maxBytes && maxDim > 900){
-    maxDim -= 200;
-    quality = Math.max(0.5, quality); // خليك في جودة معقولة
-    blob = await canvasCompress_(img, maxDim, quality);
-  }
-
-  return blob;
 }
 
 function loadImage_(file){
@@ -225,7 +176,6 @@ function canvasCompress_(img, maxDim, quality){
   return new Promise((resolve) => {
     let { width, height } = img;
 
-    // حفظ النسبة
     const scale = Math.min(1, maxDim / Math.max(width, height));
     width = Math.round(width * scale);
     height = Math.round(height * scale);
@@ -237,13 +187,51 @@ function canvasCompress_(img, maxDim, quality){
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0, width, height);
 
-    // نحول إلى JPEG لتقليل الحجم
     canvas.toBlob((blob) => {
-      resolve(blob || file);
+      resolve(blob || new Blob([], {type:'image/jpeg'}));
     }, 'image/jpeg', quality);
   });
 }
 
+async function compressImageToUnderLimit_(file, maxBytes){
+  const img = await loadImage_(file);
+
+  let maxDim = 1600;
+  let quality = 0.82;
+  let blob = await canvasCompress_(img, maxDim, quality);
+
+  while(blob.size > maxBytes && quality > 0.45){
+    quality -= 0.08;
+    blob = await canvasCompress_(img, maxDim, quality);
+  }
+
+  while(blob.size > maxBytes && maxDim > 900){
+    maxDim -= 200;
+    quality = Math.max(0.5, quality);
+    blob = await canvasCompress_(img, maxDim, quality);
+  }
+
+  return blob;
+}
+
+async function fileToDataUrl(file){
+  const MAX_SIZE = 3 * 1024 * 1024;
+
+  if(!file) throw new Error("لم يتم اختيار صورة.");
+  if(!String(file.type || '').startsWith('image/')) throw new Error("الملف المختار لازم يكون صورة.");
+
+  if(file.size <= MAX_SIZE){
+    return await readAsDataURL_(file);
+  }
+
+  const compressedBlob = await compressImageToUnderLimit_(file, MAX_SIZE);
+
+  if(compressedBlob.size > MAX_SIZE){
+    throw new Error("تعذر ضغط الصورة تحت 3 ميجا. جرّب صورة أوضح/أقل حجمًا.");
+  }
+
+  return await readAsDataURL_(compressedBlob);
+}
 
 function setMsg(text, ok){
   const m = document.getElementById('msg');
@@ -263,38 +251,44 @@ function fail(message){
   return;
 }
 
-(async function init(){
+(function init(){
   const qs = getQS();
   if(qs.guardian_civil_id) document.getElementById('guardian_civil_id').value = qs.guardian_civil_id;
   if(qs.box_number) document.getElementById('box_number').value = qs.box_number;
   if(qs.guardian_name) document.getElementById('guardian_name').value = qs.guardian_name;
-  addChild(); // ابدأ بمتسابق واحد تلقائيًا
+  addChild();
 })();
 
- function formatBytes(bytes){
+function formatBytes(bytes){
   const mb = bytes / (1024 * 1024);
   return mb.toFixed(2) + " MB";
 }
+
 const MAX_SIZE = 3 * 1024 * 1024;
 
+/**
+ * ✅ مهم: زر الإرسال يتقفل فقط لو الصور "مش موجودة"
+ * وليس بسبب الحجم لأننا هنضغط تلقائيًا.
+ */
 function refreshSubmitState(){
   const btn = document.getElementById('submitBtn');
   if(!btn) return;
 
   let ok = true;
 
-  // صورة ولي الأمر
   const gFile = document.getElementById('guardian_id_img')?.files?.[0];
-  if(gFile && gFile.size > MAX_SIZE) ok = false;
+  if(!gFile) ok = false;
 
-  // صور الأبناء
+  let hasAnyChild = false;
   for(let i=0;i<childIndex;i++){
     const card = document.getElementById('child_' + i);
     if(!card) continue;
-
+    hasAnyChild = true;
     const cFile = document.getElementById('child_id_img_' + i)?.files?.[0];
-    if(cFile && cFile.size > MAX_SIZE) ok = false;
+    if(!cFile) ok = false;
   }
+
+  if(!hasAnyChild) ok = false;
 
   btn.disabled = !ok;
   btn.style.opacity = ok ? "1" : "0.6";
@@ -310,24 +304,23 @@ function showFileSize(input, labelId){
   if(!file){
     el.textContent = "لم يتم اختيار صورة بعد";
     el.className = "hint";
-    refreshSubmitState();   // 👈 مهم
+    refreshSubmitState();
     return;
   }
 
   const sizeText = formatBytes(file.size);
 
-if(file.size > MAX_SIZE){
-  el.textContent = `حجم الصورة: ${sizeText} — سيتم ضغطها تلقائيًا قبل الإرسال ✅`;
-  el.className = "hint";
-}else{
-  el.textContent = `حجم الصورة: ${sizeText} ✅`;
-  el.className = "hint";
+  if(file.size > MAX_SIZE){
+    el.textContent = `حجم الصورة: ${sizeText} — سيتم ضغطها تلقائيًا قبل الإرسال ✅`;
+    el.className = "hint";
+  }else{
+    el.textContent = `حجم الصورة: ${sizeText} ✅`;
+    el.className = "hint";
+  }
+
+  refreshSubmitState();
 }
 
-
-  refreshSubmitState();   // 👈 مهم
-}
- 
 async function submitAll(){
   setBusy(true);
 
@@ -339,7 +332,6 @@ async function submitAll(){
     const guardianFile = document.getElementById('guardian_id_img').files[0];
     if(!guardianFile) return fail("صورة بطاقة ولي الأمر مطلوبة.");
 
-    // اجمع الأبناء الموجودين (حتى لو حصل حذف)
     const children = [];
 
     for(let i=0;i<childIndex;i++){
@@ -377,30 +369,20 @@ async function submitAll(){
       return fail(err.message);
     }
 
-    const payload = {
+    const body = new URLSearchParams({
       action: "register",
       guardian_name,
       guardian_civil_id,
       box_number,
       guardian_id_image_base64,
-      children
-    };
+      children: JSON.stringify(children)
+    });
 
-   const body = new URLSearchParams({
-  action: "register",
-  guardian_name,
-  guardian_civil_id,
-  box_number,
-  guardian_id_image_base64,
-  children: JSON.stringify(children)
-});
-
-const res = await fetch(API_URL, {
-  method:"POST",
-  headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
-  body
-});
-
+    const res = await fetch(API_URL, {
+      method:"POST",
+      headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+      body
+    });
 
     const data = await res.json();
 
