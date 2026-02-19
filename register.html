@@ -30,6 +30,8 @@
   .msg{margin-top:12px;text-align:center;font-weight:700}
   .err{color:#b00020}
   .ok{color:#1b5e20}
+ .hint{font-size:12px;color:#666;margin-top:6px}
+.hint.bad{color:#b00020;font-weight:700}
 </style>
 </head>
 <body>
@@ -55,7 +57,9 @@
 
       <div>
         <label>صورة البطاقة المدنية (ولي الأمر)</label>
-        <input id="guardian_id_img" type="file" accept="image/*" />
+        <input id="guardian_id_img" type="file" accept="image/*" onchange="showFileSize(this, 'guardian_size')" />
+<div class="hint" id="guardian_size">لم يتم اختيار صورة بعد</div>
+
       </div>
 
       <div class="full">
@@ -129,7 +133,9 @@ function childTemplate(i){
 
         <div class="full">
           <label>صورة البطاقة المدنية (المتسابق)</label>
-          <input id="child_id_img_${i}" type="file" accept="image/*" />
+          <input id="child_id_img_${i}" type="file" accept="image/*" onchange="showFileSize(this, 'child_size_${i}')" />
+<div class="hint" id="child_size_${i}">لم يتم اختيار صورة بعد</div>
+
         </div>
       </div>
     </div>
@@ -150,6 +156,13 @@ function removeChild(i){
 async function fileToDataUrl(file){
   const MAX_SIZE = 3 * 1024 * 1024; // 3MB
 
+  if(!file) throw new Error("لم يتم اختيار صورة.");
+
+  // تأكيد أنها صورة
+  if(!String(file.type || '').startsWith('image/')){
+    throw new Error("الملف المختار لازم يكون صورة.");
+  }
+
   if(file.size > MAX_SIZE){
     throw new Error("حجم الصورة يجب ألا يتجاوز 3 ميجا.");
   }
@@ -162,11 +175,22 @@ async function fileToDataUrl(file){
   });
 }
 
-
 function setMsg(text, ok){
   const m = document.getElementById('msg');
   m.textContent = text;
   m.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+function setBusy(isBusy){
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = isBusy;
+  btn.textContent = isBusy ? "جارٍ الإرسال..." : "إرسال التسجيل";
+}
+
+function fail(message){
+  setMsg(message, false);
+  setBusy(false);
+  return;
 }
 
 (async function init(){
@@ -174,15 +198,40 @@ function setMsg(text, ok){
   if(qs.guardian_civil_id) document.getElementById('guardian_civil_id').value = qs.guardian_civil_id;
   if(qs.box_number) document.getElementById('box_number').value = qs.box_number;
   if(qs.guardian_name) document.getElementById('guardian_name').value = qs.guardian_name;
-
-  // ابدأ بمتسابق واحد تلقائيًا
-  addChild();
+  addChild(); // ابدأ بمتسابق واحد تلقائيًا
 })();
 
+ function formatBytes(bytes){
+  const mb = bytes / (1024 * 1024);
+  return mb.toFixed(2) + " MB";
+}
+
+function showFileSize(input, labelId){
+  const el = document.getElementById(labelId);
+  const file = input && input.files ? input.files[0] : null;
+
+  if(!el) return;
+
+  if(!file){
+    el.textContent = "لم يتم اختيار صورة بعد";
+    el.className = "hint";
+    return;
+  }
+
+  const MAX_SIZE = 3 * 1024 * 1024;
+  const sizeText = formatBytes(file.size);
+
+  if(file.size > MAX_SIZE){
+    el.textContent = `حجم الصورة: ${sizeText} (أكبر من 3 ميجا ❌)`;
+    el.className = "hint bad";
+  }else{
+    el.textContent = `حجم الصورة: ${sizeText} ✅`;
+    el.className = "hint";
+  }
+}
+ 
 async function submitAll(){
-  const btn = document.getElementById('submitBtn');
-  btn.disabled = true;
-  btn.textContent = "جارٍ الإرسال...";
+  setBusy(true);
 
   try{
     const guardian_name = document.getElementById('guardian_name').value.trim();
@@ -190,13 +239,11 @@ async function submitAll(){
     const box_number = digits(document.getElementById('box_number').value);
 
     const guardianFile = document.getElementById('guardian_id_img').files[0];
-    if(!guardianFile){
-      setMsg("صورة بطاقة ولي الأمر مطلوبة.", false);
-      return;
-    }
+    if(!guardianFile) return fail("صورة بطاقة ولي الأمر مطلوبة.");
 
     // اجمع الأبناء الموجودين (حتى لو حصل حذف)
     const children = [];
+
     for(let i=0;i<childIndex;i++){
       const card = document.getElementById('child_' + i);
       if(!card) continue;
@@ -208,20 +255,29 @@ async function submitAll(){
       const childFile = document.getElementById('child_id_img_' + i).files[0];
 
       if(!child_name || child_civil_id.length < 8 || !gender || !stage || !childFile){
-        setMsg(`تأكد من بيانات المتسابق #${i+1} وصورته.`, false);
-        return;
+        return fail(`تأكد من بيانات المتسابق #${i+1} وصورته.`);
       }
 
-      const child_id_image_base64 = await fileToDataUrl(childFile);
+      let child_id_image_base64;
+      try{
+        child_id_image_base64 = await fileToDataUrl(childFile);
+      }catch(err){
+        return fail(err.message + ` (المتسابق #${i+1})`);
+      }
+
       children.push({ child_name, child_civil_id, gender, stage, child_id_image_base64 });
     }
 
     if(!children.length){
-      setMsg("أضف متسابق واحد على الأقل.", false);
-      return;
+      return fail("أضف متسابق واحد على الأقل.");
     }
 
-    const guardian_id_image_base64 = await fileToDataUrl(guardianFile);
+    let guardian_id_image_base64;
+    try{
+      guardian_id_image_base64 = await fileToDataUrl(guardianFile);
+    }catch(err){
+      return fail(err.message);
+    }
 
     const payload = {
       action: "register",
@@ -241,18 +297,15 @@ async function submitAll(){
     const data = await res.json();
 
     if(data && data.ok){
-      // نجاح: انقل لـ success ومعاه أرقام التسجيل
       const items = encodeURIComponent(JSON.stringify(data.items || []));
       window.location.href = "success.html?items=" + items;
-    }else{
-      setMsg((data && data.error) ? data.error : "فشل التسجيل.", false);
+      return;
     }
 
+    return fail((data && data.error) ? data.error : "فشل التسجيل.");
+
   }catch(e){
-    setMsg("حصل خطأ أثناء الإرسال. جرّب مرة أخرى.", false);
-  }finally{
-    btn.disabled = false;
-    btn.textContent = "إرسال التسجيل";
+    return fail("حصل خطأ أثناء الإرسال. جرّب مرة أخرى.");
   }
 }
 </script>
