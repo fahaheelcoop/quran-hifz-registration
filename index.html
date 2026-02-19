@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مسابقة حفظ القرآن الكريم 2026</title>
+
+<style>
+body{
+  font-family: Arial, sans-serif;
+  background:#f6f7fb;
+  margin:0;
+  padding:40px;
+}
+
+.card{
+  max-width:500px;
+  margin:auto;
+  background:#fff;
+  padding:30px;
+  border-radius:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.08);
+}
+
+h2{
+  text-align:center;
+  margin-bottom:25px;
+}
+
+label{
+  display:block;
+  margin:15px 0 5px;
+}
+
+input{
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
+
+button{
+  width:100%;
+  margin-top:20px;
+  padding:12px;
+  background:#2e7d32;
+  color:white;
+  border:none;
+  border-radius:10px;
+  font-size:16px;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#256628;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+  <h2>التسجيل في مسابقة حفظ القرآن الكريم</h2>
+
+  <label>الرقم المدني</label>
+  <input type="text" id="civil_id">
+
+  <label>رقم الصندوق</label>
+  <input type="text" id="box_number">
+
+  <button onclick="check()">تحقق من البيانات</button>
+</div>
+
+<script>
+function check(){
+  alert("سيتم ربط التحقق مع قاعدة البيانات في الخطوة القادمة");
+}
+</script>
+
+</body>
+</html>
