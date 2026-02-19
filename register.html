@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>تسجيل المتسابق</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Arial,sans-serif;background:#f6f7fb;margin:0;padding:24px}
+  .wrap{max-width:900px;margin:0 auto}
+  .card{background:#fff;border-radius:16px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+  h2{margin:0 0 14px;text-align:center}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  label{display:block;margin:10px 0 6px;font-weight:700}
+  input,select{width:100%;padding:11px;border:1px solid #d8d8d8;border-radius:10px}
+  .full{grid-column:1/-1}
+  .row{display:flex;gap:12px}
+  .row > div{flex:1}
+  button{
+    width:100%;margin-top:14px;padding:14px 16px;border:0;border-radius:12px;
+    background:#2e7d32;color:#fff;font-size:16px;cursor:pointer
+  }
+  button:hover{background:#256628}
+  .muted{color:#666;text-align:center;margin:10px 0 0}
+  .child-card{border:1px solid #eee;border-radius:14px;padding:14px;margin-top:12px;background:#fafafa}
+  .child-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .child-head h3{margin:0;font-size:16px}
+  .danger{background:#c62828}
+  .danger:hover{background:#a32020}
+  .btn-secondary{background:#6c63ff}
+  .btn-secondary:hover{background:#5a52df}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h2>تسجيل المتسابقين</h2>
+
+    <div class="grid">
+      <div>
+        <label>اسم ولي الأمر</label>
+        <input id="guardian_name" placeholder="مثال: محمد أحمد" />
+      </div>
+
+      <div>
+        <label>الرقم المدني (ولي الأمر)</label>
+        <input id="guardian_civil" inputmode="numeric" placeholder="رقم مدني" />
+      </div>
+
+      <div>
+        <label>رقم الصندوق</label>
+        <input id="box_number" inputmode="numeric" placeholder="رقم الصندوق" />
+      </div>
+
+      <div>
+        <label>صورة البطاقة المدنية (ولي الأمر)</label>
+        <input id="guardian_id_img" type="file" accept="image/*" />
+      </div>
+
+      <div class="full">
+        <button class="btn-secondary" type="button" onclick="addChild()">+ إضافة ابن/ابنة</button>
+      </div>
+
+      <div class="full" id="childrenWrap"></div>
+
+      <div class="full">
+        <button type="button" onclick="submitAll()">إرسال التسجيل</button>
+        <p class="muted">لن يتم الإرسال فعليًا الآن — هنربطها بـ Google Apps Script في الخطوة القادمة.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let childIndex = 0;
+
+function childTemplate(i){
+  return `
+    <div class="child-card" id="child_${i}">
+      <div class="child-head">
+        <h3>بيانات المتسابق #${i+1}</h3>
+        <button class="danger" type="button" onclick="removeChild(${i})">حذف</button>
+      </div>
+
+      <div class="grid" style="margin-top:10px">
+        <div>
+          <label>اسم المتسابق</label>
+          <input id="child_name_${i}" placeholder="اسم الابن/الابنة" />
+        </div>
+
+        <div>
+          <label>الرقم المدني (المتسابق)</label>
+          <input id="child_civil_${i}" inputmode="numeric" placeholder="رقم مدني" />
+        </div>
+
+        <div>
+          <label>النوع</label>
+          <select id="gender_${i}">
+            <option value="">اختر</option>
+            <option value="Boys">بنين</option>
+            <option value="Girls">بنات</option>
+          </select>
+        </div>
+
+        <div>
+          <label>المرحلة</label>
+          <select id="stage_${i}">
+            <option value="">اختر</option>
+            <option value="KG">الروضة</option>
+            <option value="Primary">الابتدائي</option>
+            <option value="Middle">المتوسط</option>
+            <option value="Secondary">الثانوي</option>
+          </select>
+        </div>
+
+        <div class="full">
+          <label>صورة البطاقة المدنية (المتسابق)</label>
+          <input id="child_id_img_${i}" type="file" accept="image/*" />
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function addChild(){
+  const wrap = document.getElementById('childrenWrap');
+  const html = childTemplate(childIndex);
+  wrap.insertAdjacentHTML('beforeend', html);
+  childIndex++;
+}
+
+function removeChild(i){
+  const el = document.getElementById('child_' + i);
+  if(el) el.remove();
+}
+
+function submitAll(){
+  alert("تمام. الخطوة الجاية: نعمل Google Sheet + Apps Script ونربط الإرسال والرفع والتسلسل.");
+}
+</script>
+</body>
+</html>
