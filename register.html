@@ -79,6 +79,7 @@
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbyo4zs3v4Qno0j_p5N-8qV2WR-HFG63nlrWR-F773WKLjj3cnDAg94zu9vVOMYvTngJ/exec";
 let childIndex = 0;
+ let IS_BUSY = false;
 
 function digits(x){ return String(x||"").replace(/\D+/g,""); }
 
@@ -239,11 +240,7 @@ function setMsg(text, ok){
   m.className = 'msg ' + (ok ? 'ok' : 'err');
 }
 
-function setBusy(isBusy){
-  const btn = document.getElementById('submitBtn');
-  btn.disabled = isBusy;
-  btn.textContent = isBusy ? "جارٍ الإرسال..." : "إرسال التسجيل";
-}
+setBusy
 
 function fail(message){
   setMsg(message, false);
@@ -274,25 +271,10 @@ function refreshSubmitState(){
   const btn = document.getElementById('submitBtn');
   if(!btn) return;
 
-  let ok = true;
-
-  const gFile = document.getElementById('guardian_id_img')?.files?.[0];
-  if(!gFile) ok = false;
-
-  let hasAnyChild = false;
-  for(let i=0;i<childIndex;i++){
-    const card = document.getElementById('child_' + i);
-    if(!card) continue;
-    hasAnyChild = true;
-    const cFile = document.getElementById('child_id_img_' + i)?.files?.[0];
-    if(!cFile) ok = false;
-  }
-
-  if(!hasAnyChild) ok = false;
-
-  btn.disabled = !ok;
-  btn.style.opacity = ok ? "1" : "0.6";
-  btn.style.cursor = ok ? "pointer" : "not-allowed";
+  // الزر يظل شغال دايمًا — إلا أثناء الإرسال فقط
+  btn.disabled = !!IS_BUSY;
+  btn.style.opacity = btn.disabled ? "0.7" : "1";
+  btn.style.cursor = btn.disabled ? "not-allowed" : "pointer";
 }
 
 function showFileSize(input, labelId){
