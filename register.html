@@ -288,11 +288,21 @@ async function submitAll(){
       children
     };
 
-    const res = await fetch(API_URL, {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(payload)
-    });
+   const body = new URLSearchParams({
+  action: "register",
+  guardian_name,
+  guardian_civil_id,
+  box_number,
+  guardian_id_image_base64,
+  children: JSON.stringify(children)
+});
+
+const res = await fetch(API_URL, {
+  method:"POST",
+  headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+  body
+});
+
 
     const data = await res.json();
 
