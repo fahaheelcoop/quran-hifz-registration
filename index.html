@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>مسابقة حفظ القرآن الكريم 2026</title>
-
 <style>
   *{box-sizing:border-box}
   body{font-family:Arial,sans-serif;background:#f6f7fb;margin:0;padding:40px}
@@ -20,54 +19,89 @@
   .small{color:#666;font-size:13px;margin-top:8px;text-align:center}
 </style>
 </head>
-
 <body>
 <div class="card">
   <h2>التسجيل في مسابقة حفظ القرآن الكريم</h2>
 
-  <!-- ✅ فورم مباشر للـ Apps Script (بدون fetch / بدون CORS) -->
-  <form id="allowForm" method="POST" action="https://script.google.com/macros/s/AKfycbyo4zs3v4Qno0j_p5N-8qV2WR-HFG63nlrWR-F773WKLjj3cnDAg94zu9vVOMYvTngJ/exec" onsubmit="return onSubmitAllow()">
-    <input type="hidden" name="action" value="checkAllowed">
-    <input type="hidden" name="return_url" value="1">
-
+  <form id="checkForm">
     <label>الرقم المدني (ولي الأمر)</label>
-    <input type="text" id="civil_id" name="guardian_civil_id" inputmode="numeric" placeholder="مثال: 123456789012" />
+    <input type="text" id="civil_id" inputmode="numeric" placeholder="مثال: 123456789012" />
 
     <label>رقم الصندوق</label>
-    <input type="text" id="box_number" name="box_number" inputmode="numeric" placeholder="مثال: 1234" />
+    <input type="text" id="box_number" inputmode="numeric" placeholder="مثال: 1234" />
 
     <button id="btn" type="submit">تحقق وابدأ التسجيل</button>
-
-    <div class="msg" id="msg"></div>
-    <div class="small">سيتم السماح فقط للأرقام الموجودة ضمن المسموح لهم.</div>
   </form>
+
+  <div class="msg" id="msg"></div>
+  <div class="small">سيتم السماح فقط للأرقام الموجودة ضمن المسموح لهم.</div>
 </div>
 
 <script>
+const API_URL = "https://script.google.com/macros/s/AKfycbyo4zs3v4Qno0j_p5N-8qV2WR-HFG63nlrWR-F773WKLjj3cnDAg94zu9vVOMYvTngJ/exec";
+
 function digits(x){ return String(x||"").replace(/\D+/g,""); }
 
-function onSubmitAllow(){
+document.getElementById('checkForm').addEventListener('submit', (ev) => {
+  ev.preventDefault();      // ✅ يمنع أي انتقال
+  checkAllowed();
+});
+
+async function checkAllowed(){
   const btn = document.getElementById('btn');
   const msg = document.getElementById('msg');
   msg.textContent = '';
   msg.className = 'msg';
 
-  // نظّف المدخلات (خليها أرقام فقط) قبل الإرسال
-  const civilEl = document.getElementById('civil_id');
-  const boxEl = document.getElementById('box_number');
+  const guardian_civil_id = digits(document.getElementById('civil_id').value);
+  const box_number = digits(document.getElementById('box_number').value);
 
-  civilEl.value = digits(civilEl.value);
-  boxEl.value = digits(boxEl.value);
-
-  if(civilEl.value.length < 8 || boxEl.value.length < 1){
+  if(guardian_civil_id.length < 8 || box_number.length < 1){
     msg.textContent = "من فضلك أدخل رقم مدني ورقم صندوق صحيحين.";
     msg.classList.add('err');
-    return false; // امنع الإرسال
+    return;
   }
 
   btn.disabled = true;
   btn.textContent = "جارٍ التحقق...";
-  return true; // اسمح بالإرسال (هينقلك للـ Apps Script ثم يرجعك تلقائيًا)
+
+  try{
+    const body = new URLSearchParams({
+      action: "checkAllowed",
+      guardian_civil_id,
+      box_number
+    });
+
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+      body
+    });
+
+    const data = await res.json();
+
+    if(data && data.ok){
+      msg.textContent = "تم التحقق بنجاح ✅ سيتم تحويلك للتسجيل الآن...";
+      msg.classList.add('ok');
+
+      const q = new URLSearchParams({
+        guardian_civil_id,
+        box_number,
+        guardian_name: data.guardian_name || ""
+      });
+      window.location.href = "register.html?" + q.toString(); // ✅ GitHub
+    }else{
+      msg.textContent = (data && data.error) ? data.error : "تعذر التحقق.";
+      msg.classList.add('err');
+    }
+
+  }catch(e){
+    msg.textContent = "حصل خطأ في الاتصال. جرّب مرة أخرى.";
+    msg.classList.add('err');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = "تحقق وابدأ التسجيل";
+  }
 }
 </script>
 </body>
