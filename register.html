@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>تسجيل المتسابق</title>
+<title>تسجيل المتسابقين</title>
 <style>
   *{box-sizing:border-box}
   body{font-family:Arial,sans-serif;background:#f6f7fb;margin:0;padding:24px}
@@ -14,21 +14,22 @@
   label{display:block;margin:10px 0 6px;font-weight:700}
   input,select{width:100%;padding:11px;border:1px solid #d8d8d8;border-radius:10px}
   .full{grid-column:1/-1}
-  .row{display:flex;gap:12px}
-  .row > div{flex:1}
   button{
     width:100%;margin-top:14px;padding:14px 16px;border:0;border-radius:12px;
     background:#2e7d32;color:#fff;font-size:16px;cursor:pointer
   }
   button:hover{background:#256628}
+  .btn-secondary{background:#6c63ff}
+  .btn-secondary:hover{background:#5a52df}
+  .danger{background:#c62828}
+  .danger:hover{background:#a32020}
   .muted{color:#666;text-align:center;margin:10px 0 0}
   .child-card{border:1px solid #eee;border-radius:14px;padding:14px;margin-top:12px;background:#fafafa}
   .child-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
   .child-head h3{margin:0;font-size:16px}
-  .danger{background:#c62828}
-  .danger:hover{background:#a32020}
-  .btn-secondary{background:#6c63ff}
-  .btn-secondary:hover{background:#5a52df}
+  .msg{margin-top:12px;text-align:center;font-weight:700}
+  .err{color:#b00020}
+  .ok{color:#1b5e20}
 </style>
 </head>
 <body>
@@ -44,7 +45,7 @@
 
       <div>
         <label>الرقم المدني (ولي الأمر)</label>
-        <input id="guardian_civil" inputmode="numeric" placeholder="رقم مدني" />
+        <input id="guardian_civil_id" inputmode="numeric" placeholder="رقم مدني" />
       </div>
 
       <div>
@@ -64,15 +65,28 @@
       <div class="full" id="childrenWrap"></div>
 
       <div class="full">
-        <button type="button" onclick="submitAll()">إرسال التسجيل</button>
-        <p class="muted">لن يتم الإرسال فعليًا الآن — هنربطها بـ Google Apps Script في الخطوة القادمة.</p>
+        <button id="submitBtn" type="button" onclick="submitAll()">إرسال التسجيل</button>
+        <div class="msg" id="msg"></div>
+        <p class="muted">ملاحظة: كل ابن/ابنة = صف مستقل في قاعدة البيانات.</p>
       </div>
     </div>
   </div>
 </div>
 
 <script>
+const API_URL = "https://script.google.com/macros/s/AKfycbyo4zs3v4Qno0j_p5N-8qV2WR-HFG63nlrWR-F773WKLjj3cnDAg94zu9vVOMYvTngJ/exec";
 let childIndex = 0;
+
+function digits(x){ return String(x||"").replace(/\D+/g,""); }
+
+function getQS(){
+  const q = new URLSearchParams(window.location.search);
+  return {
+    guardian_civil_id: digits(q.get('guardian_civil_id')||""),
+    box_number: digits(q.get('box_number')||""),
+    guardian_name: (q.get('guardian_name')||"").trim()
+  };
+}
 
 function childTemplate(i){
   return `
@@ -90,7 +104,7 @@ function childTemplate(i){
 
         <div>
           <label>الرقم المدني (المتسابق)</label>
-          <input id="child_civil_${i}" inputmode="numeric" placeholder="رقم مدني" />
+          <input id="child_civil_id_${i}" inputmode="numeric" placeholder="رقم مدني" />
         </div>
 
         <div>
@@ -124,8 +138,7 @@ function childTemplate(i){
 
 function addChild(){
   const wrap = document.getElementById('childrenWrap');
-  const html = childTemplate(childIndex);
-  wrap.insertAdjacentHTML('beforeend', html);
+  wrap.insertAdjacentHTML('beforeend', childTemplate(childIndex));
   childIndex++;
 }
 
@@ -134,8 +147,106 @@ function removeChild(i){
   if(el) el.remove();
 }
 
-function submitAll(){
-  alert("تمام. الخطوة الجاية: نعمل Google Sheet + Apps Script ونربط الإرسال والرفع والتسلسل.");
+async function fileToDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result || ''));
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+function setMsg(text, ok){
+  const m = document.getElementById('msg');
+  m.textContent = text;
+  m.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+(async function init(){
+  const qs = getQS();
+  if(qs.guardian_civil_id) document.getElementById('guardian_civil_id').value = qs.guardian_civil_id;
+  if(qs.box_number) document.getElementById('box_number').value = qs.box_number;
+  if(qs.guardian_name) document.getElementById('guardian_name').value = qs.guardian_name;
+
+  // ابدأ بمتسابق واحد تلقائيًا
+  addChild();
+})();
+
+async function submitAll(){
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = "جارٍ الإرسال...";
+
+  try{
+    const guardian_name = document.getElementById('guardian_name').value.trim();
+    const guardian_civil_id = digits(document.getElementById('guardian_civil_id').value);
+    const box_number = digits(document.getElementById('box_number').value);
+
+    const guardianFile = document.getElementById('guardian_id_img').files[0];
+    if(!guardianFile){
+      setMsg("صورة بطاقة ولي الأمر مطلوبة.", false);
+      return;
+    }
+
+    // اجمع الأبناء الموجودين (حتى لو حصل حذف)
+    const children = [];
+    for(let i=0;i<childIndex;i++){
+      const card = document.getElementById('child_' + i);
+      if(!card) continue;
+
+      const child_name = (document.getElementById('child_name_' + i).value || '').trim();
+      const child_civil_id = digits(document.getElementById('child_civil_id_' + i).value);
+      const gender = (document.getElementById('gender_' + i).value || '').trim();
+      const stage = (document.getElementById('stage_' + i).value || '').trim();
+      const childFile = document.getElementById('child_id_img_' + i).files[0];
+
+      if(!child_name || child_civil_id.length < 8 || !gender || !stage || !childFile){
+        setMsg(`تأكد من بيانات المتسابق #${i+1} وصورته.`, false);
+        return;
+      }
+
+      const child_id_image_base64 = await fileToDataUrl(childFile);
+      children.push({ child_name, child_civil_id, gender, stage, child_id_image_base64 });
+    }
+
+    if(!children.length){
+      setMsg("أضف متسابق واحد على الأقل.", false);
+      return;
+    }
+
+    const guardian_id_image_base64 = await fileToDataUrl(guardianFile);
+
+    const payload = {
+      action: "register",
+      guardian_name,
+      guardian_civil_id,
+      box_number,
+      guardian_id_image_base64,
+      children
+    };
+
+    const res = await fetch(API_URL, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if(data && data.ok){
+      // نجاح: انقل لـ success ومعاه أرقام التسجيل
+      const items = encodeURIComponent(JSON.stringify(data.items || []));
+      window.location.href = "success.html?items=" + items;
+    }else{
+      setMsg((data && data.error) ? data.error : "فشل التسجيل.", false);
+    }
+
+  }catch(e){
+    setMsg("حصل خطأ أثناء الإرسال. جرّب مرة أخرى.", false);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = "إرسال التسجيل";
+  }
 }
 </script>
 </body>
