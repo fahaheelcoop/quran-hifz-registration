@@ -79,7 +79,7 @@
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbyo4zs3v4Qno0j_p5N-8qV2WR-HFG63nlrWR-F773WKLjj3cnDAg94zu9vVOMYvTngJ/exec";
 let childIndex = 0;
- let IS_BUSY = false;
+let IS_BUSY = false;
 
 function digits(x){ return String(x||"").replace(/\D+/g,""); }
 
@@ -240,8 +240,13 @@ function setMsg(text, ok){
   m.className = 'msg ' + (ok ? 'ok' : 'err');
 }
 
-setBusy
+/* ✅ إضافة setBusy الصحيحة بدل السطر المكسور "setBusy" */
+function setBusy(v){
+  IS_BUSY = !!v;
+  refreshSubmitState();
+}
 
+/* ✅ مهم: رجوع fail كما هو لكن يعتمد على setBusy */
 function fail(message){
   setMsg(message, false);
   setBusy(false);
@@ -250,9 +255,24 @@ function fail(message){
 
 (function init(){
   const qs = getQS();
-  if(qs.guardian_civil_id) document.getElementById('guardian_civil_id').value = qs.guardian_civil_id;
-  if(qs.box_number) document.getElementById('box_number').value = qs.box_number;
+
+  // ✅ لو الصفحة اتفتحت بدون رقم ولي الأمر أو رقم الصندوق → ارجع لصفحة التحقق
+  if(!qs.guardian_civil_id || qs.guardian_civil_id.length < 8 || !qs.box_number || qs.box_number.length < 1){
+    alert('من فضلك ادخل من صفحة التحقق أولاً.');
+    window.location.href = 'index.html';
+    return;
+  }
+
+  // ✅ تعبئة البيانات تلقائياً
+  document.getElementById('guardian_civil_id').value = qs.guardian_civil_id;
+  document.getElementById('box_number').value = qs.box_number;
   if(qs.guardian_name) document.getElementById('guardian_name').value = qs.guardian_name;
+
+  // ✅ جعل الرقم المدني ورقم الصندوق للعرض فقط (اختياري لكنه يمنع اللخبطة)
+  document.getElementById('guardian_civil_id').readOnly = true;
+  document.getElementById('box_number').readOnly = true;
+
+  // ✅ إضافة متسابق افتراضي تلقائياً عند فتح الصفحة
   addChild();
 })();
 
@@ -264,14 +284,12 @@ function formatBytes(bytes){
 const MAX_SIZE = 3 * 1024 * 1024;
 
 /**
- * ✅ مهم: زر الإرسال يتقفل فقط لو الصور "مش موجودة"
- * وليس بسبب الحجم لأننا هنضغط تلقائيًا.
+ * ✅ مهم: زر الإرسال يتقفل فقط أثناء الإرسال
  */
 function refreshSubmitState(){
   const btn = document.getElementById('submitBtn');
   if(!btn) return;
 
-  // الزر يظل شغال دايمًا — إلا أثناء الإرسال فقط
   btn.disabled = !!IS_BUSY;
   btn.style.opacity = btn.disabled ? "0.7" : "1";
   btn.style.cursor = btn.disabled ? "not-allowed" : "pointer";
@@ -378,6 +396,8 @@ async function submitAll(){
 
   }catch(e){
     return fail("حصل خطأ أثناء الإرسال. جرّب مرة أخرى.");
+  } finally {
+    setBusy(false);
   }
 }
 </script>
