@@ -205,6 +205,31 @@ function fail(message){
   const mb = bytes / (1024 * 1024);
   return mb.toFixed(2) + " MB";
 }
+const MAX_SIZE = 3 * 1024 * 1024;
+
+function refreshSubmitState(){
+  const btn = document.getElementById('submitBtn');
+  if(!btn) return;
+
+  let ok = true;
+
+  // صورة ولي الأمر
+  const gFile = document.getElementById('guardian_id_img')?.files?.[0];
+  if(gFile && gFile.size > MAX_SIZE) ok = false;
+
+  // صور الأبناء
+  for(let i=0;i<childIndex;i++){
+    const card = document.getElementById('child_' + i);
+    if(!card) continue;
+
+    const cFile = document.getElementById('child_id_img_' + i)?.files?.[0];
+    if(cFile && cFile.size > MAX_SIZE) ok = false;
+  }
+
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? "1" : "0.6";
+  btn.style.cursor = ok ? "pointer" : "not-allowed";
+}
 
 function showFileSize(input, labelId){
   const el = document.getElementById(labelId);
@@ -215,10 +240,10 @@ function showFileSize(input, labelId){
   if(!file){
     el.textContent = "لم يتم اختيار صورة بعد";
     el.className = "hint";
+    refreshSubmitState();   // 👈 مهم
     return;
   }
 
-  const MAX_SIZE = 3 * 1024 * 1024;
   const sizeText = formatBytes(file.size);
 
   if(file.size > MAX_SIZE){
@@ -228,6 +253,8 @@ function showFileSize(input, labelId){
     el.textContent = `حجم الصورة: ${sizeText} ✅`;
     el.className = "hint";
   }
+
+  refreshSubmitState();   // 👈 مهم
 }
  
 async function submitAll(){
