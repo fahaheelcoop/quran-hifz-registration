@@ -146,11 +146,13 @@ function addChild(){
   const wrap = document.getElementById('childrenWrap');
   wrap.insertAdjacentHTML('beforeend', childTemplate(childIndex));
   childIndex++;
+ refreshSubmitState();
 }
 
 function removeChild(i){
   const el = document.getElementById('child_' + i);
   if(el) el.remove();
+ refreshSubmitState();
 }
 
 async function fileToDataUrl(file){
