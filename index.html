@@ -43,6 +43,8 @@ const API_URL = "https://script.google.com/macros/s/AKfycbyo4zs3v4Qno0j_p5N-8qV2
 function digits(x){ return String(x||"").replace(/\D+/g,""); }
 
 async function checkAllowed(){
+ window.open(API_URL + "?action=ping", "_blank");
+return;
   const btn = document.getElementById('btn');
   const msg = document.getElementById('msg');
   msg.textContent = '';
