@@ -60,33 +60,41 @@ async function checkAllowed(){
   btn.disabled = true;
   btn.textContent = "جارٍ التحقق...";
 
-  try{
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ action:"checkAllowed", guardian_civil_id, box_number })
+try{
+  const body = new URLSearchParams({
+    action: "checkAllowed",
+    guardian_civil_id,
+    box_number
+  });
+
+  const res = await fetch(API_URL, {
+    method: "POST",
+    headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+    body
+  });
+
+  const data = await res.json();
+
+  if(data && data.ok){
+    msg.textContent = "تم التحقق بنجاح ✅ سيتم تحويلك للتسجيل الآن...";
+    msg.classList.add('ok');
+
+    const q = new URLSearchParams({
+      guardian_civil_id,
+      box_number,
+      guardian_name: data.guardian_name || ""
     });
-    const data = await res.json();
-
-    if(data && data.ok){
-      msg.textContent = "تم التحقق بنجاح ✅ سيتم تحويلك للتسجيل الآن...";
-      msg.classList.add('ok');
-
-      // تحويل لصفحة التسجيل مع تمرير البيانات
-      const q = new URLSearchParams({
-        guardian_civil_id,
-        box_number,
-        guardian_name: data.guardian_name || ""
-      });
-      window.location.href = "register.html?" + q.toString();
-    }else{
-      msg.textContent = (data && data.error) ? data.error : "تعذر التحقق.";
-      msg.classList.add('err');
-    }
-  }catch(e){
-    msg.textContent = "حصل خطأ في الاتصال. جرّب مرة أخرى.";
+    window.location.href = "register.html?" + q.toString();
+  }else{
+    msg.textContent = (data && data.error) ? data.error : "تعذر التحقق.";
     msg.classList.add('err');
-  }finally{
+  }
+}catch(e){
+  msg.textContent = "حصل خطأ في الاتصال. جرّب مرة أخرى.";
+  msg.classList.add('err');
+}
+
+  finally{
     btn.disabled = false;
     btn.textContent = "تحقق وابدأ التسجيل";
   }
