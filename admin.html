@@ -7,7 +7,7 @@
 <style>
   *{box-sizing:border-box}
   body{font-family:Arial,sans-serif;background:#f6f7fb;margin:0;padding:24px}
-  .wrap{max-width:1100px;margin:0 auto}
+  .wrap{max-width:1200px;margin:0 auto}
   .card{background:#fff;border-radius:16px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
   h2{margin:0 0 14px;text-align:center}
   .muted{color:#666;text-align:center;margin:0 0 16px}
@@ -17,38 +17,62 @@
   .stat .v{font-size:22px;font-weight:800}
   .two{grid-column:span 2}
   .full{grid-column:1/-1}
-  input,button{width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;font-size:15px}
+
+  input,select,button{width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;font-size:15px}
   button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
   button:hover{background:#256628}
   .btn-secondary{background:#6c63ff}
   .btn-secondary:hover{background:#5a52df}
+  .btn-dark{background:#263238}
+  .btn-dark:hover{background:#1f282c}
+
   table{width:100%;border-collapse:collapse;margin-top:12px}
   th,td{border-bottom:1px solid #eee;padding:10px;text-align:right;font-size:14px;vertical-align:top}
-  th{background:#fafafa}
+  th{background:#fafafa;position:sticky;top:0}
   .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:#f1f1f1;font-size:12px}
   .msg{margin-top:12px;text-align:center;font-weight:700}
   .err{color:#b00020}
   .ok{color:#1b5e20}
   .row-muted{color:#666;font-size:12px;margin-top:4px}
+
+  .sectionTitle{margin:18px 0 8px;font-size:18px}
+  .actions{display:flex;gap:10px;flex-wrap:wrap}
+  .actions > *{flex:1}
+
+  .mini{padding:10px;border-radius:10px;font-size:14px}
+  .btn-mini{padding:10px 12px;border-radius:10px;font-size:14px}
+
+  .linkBtn{
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:10px;
+    background:#f1f1f1;
+    text-decoration:none;
+    color:#111;
+    font-size:12px;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="card">
     <h2>لوحة التحكم (Dashboard)</h2>
-    <p class="muted">إحصائيات التسجيل + آخر التسجيلات</p>
+    <p class="muted">إحصائيات + بحث + تعديل الحالة والدرجات + تصدير CSV (Excel)</p>
 
     <div class="grid">
+      <!-- Admin key -->
       <div class="full">
         <label style="display:block;margin:0 0 8px;font-weight:700">Admin Key</label>
         <input id="admin_key" placeholder="اكتب المفتاح (ADMIN_KEY)" />
-        <div style="display:flex;gap:10px;margin-top:10px">
-          <button class="btn-secondary" type="button" onclick="loadStats()">تحديث البيانات</button>
-          <button type="button" onclick="saveKey()">حفظ المفتاح على الجهاز</button>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn-secondary" type="button" onclick="loadStats()">تحديث الإحصائيات</button>
+          <button class="btn-dark" type="button" onclick="saveKey()">حفظ المفتاح على الجهاز</button>
+          <button type="button" onclick="exportCsv()">تصدير Excel (CSV)</button>
         </div>
         <div class="msg" id="msg"></div>
       </div>
 
+      <!-- stats -->
       <div class="stat"><div class="k">إجمالي الصفوف (التسجيلات)</div><div class="v" id="total_rows">—</div></div>
       <div class="stat"><div class="k">بنين</div><div class="v" id="boys">—</div></div>
       <div class="stat"><div class="k">بنات</div><div class="v" id="girls">—</div></div>
@@ -59,9 +83,26 @@
       <div class="stat two"><div class="k">المتوسط (Middle)</div><div class="v" id="st_Middle">—</div></div>
       <div class="stat two"><div class="k">الثانوي (Secondary)</div><div class="v" id="st_Secondary">—</div></div>
 
+      <!-- Search -->
       <div class="full">
-        <h3 style="margin:10px 0 0">آخر 10 تسجيلات</h3>
-        <div style="overflow:auto">
+        <div class="sectionTitle">بحث</div>
+        <div class="actions">
+          <select id="search_field" class="mini">
+            <option value="child_civil_id">رقم مدني الطفل</option>
+            <option value="guardian_civil_id">رقم مدني ولي الأمر</option>
+            <option value="box_number">رقم الصندوق</option>
+            <option value="reg_id">Reg ID</option>
+          </select>
+          <input id="search_q" class="mini" placeholder="اكتب قيمة البحث..." />
+          <button class="btn-mini btn-secondary" type="button" onclick="doSearch()">بحث</button>
+        </div>
+        <div class="row-muted" id="searchInfo"></div>
+      </div>
+
+      <!-- Last 10 -->
+      <div class="full">
+        <div class="sectionTitle">آخر 10 تسجيلات</div>
+        <div style="overflow:auto;max-height:360px;border:1px solid #eee;border-radius:14px">
           <table>
             <thead>
               <tr>
@@ -76,6 +117,32 @@
               </tr>
             </thead>
             <tbody id="lastRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Search results + edit -->
+      <div class="full">
+        <div class="sectionTitle">نتائج البحث (تعديل Status / Score)</div>
+        <div style="overflow:auto;border:1px solid #eee;border-radius:14px">
+          <table>
+            <thead>
+              <tr>
+                <th>Reg ID</th>
+                <th>المتسابق</th>
+                <th>المرحلة</th>
+                <th>النوع</th>
+                <th>ولي الأمر</th>
+                <th>الصندوق</th>
+                <th>Status</th>
+                <th>Score</th>
+                <th>صور</th>
+                <th>حفظ</th>
+              </tr>
+            </thead>
+            <tbody id="searchRows">
+              <tr><td colspan="10" class="muted" style="text-align:center;padding:16px">ابدأ بالبحث لعرض النتائج…</td></tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -142,39 +209,188 @@ function fillStats(data){
   }
 }
 
-async function loadStats(){
-  setMsg('', true);
-
+function getAdminKeyOrWarn(){
   const admin_key = (document.getElementById('admin_key').value || '').trim();
   if(!admin_key){
     setMsg('اكتب Admin Key الأول.', false);
-    return;
+    return null;
   }
+  return admin_key;
+}
 
-  const body = new URLSearchParams({
-    action: 'getStats',
-    admin_key
+async function postForm(params){
+  const body = new URLSearchParams(params);
+  const res = await fetch(API_URL, {
+    method:'POST',
+    headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+    body
   });
+  return await res.json();
+}
+
+async function loadStats(){
+  setMsg('', true);
+  const admin_key = getAdminKeyOrWarn();
+  if(!admin_key) return;
 
   try{
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
-      body
-    });
-
-    const data = await res.json();
-
+    const data = await postForm({ action:'getStats', admin_key });
     if(data && data.ok){
       fillStats(data);
-      setMsg('تم تحديث البيانات ✅', true);
+      setMsg('تم تحديث الإحصائيات ✅', true);
+      return;
+    }
+    setMsg((data && data.error) ? data.error : 'فشل تحميل البيانات', false);
+  }catch(e){
+    setMsg('حصل خطأ أثناء الاتصال. جرّب مرة أخرى.', false);
+  }
+}
+
+async function exportCsv(){
+  setMsg('', true);
+  const admin_key = getAdminKeyOrWarn();
+  if(!admin_key) return;
+
+  try{
+    const data = await postForm({ action:'exportCsv', admin_key });
+    if(!(data && data.ok)){
+      setMsg((data && data.error) ? data.error : 'فشل التصدير', false);
       return;
     }
 
-    setMsg((data && data.error) ? data.error : 'فشل تحميل البيانات', false);
+    const csv = data.csv || '';
+    const filename = data.filename || 'registrations.csv';
+
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    setMsg('تم تصدير الملف ✅', true);
+  }catch(e){
+    setMsg('حصل خطأ أثناء التصدير.', false);
+  }
+}
+
+async function doSearch(){
+  setMsg('', true);
+  const admin_key = getAdminKeyOrWarn();
+  if(!admin_key) return;
+
+  const field = (document.getElementById('search_field').value || '').trim();
+  const q = (document.getElementById('search_q').value || '').trim();
+  if(!q){
+    setMsg('اكتب قيمة البحث.', false);
+    return;
+  }
+
+  document.getElementById('searchInfo').textContent = 'جاري البحث...';
+  const tbody = document.getElementById('searchRows');
+  tbody.innerHTML = `<tr><td colspan="10" class="muted" style="text-align:center;padding:16px">جاري التحميل...</td></tr>`;
+
+  try{
+    const data = await postForm({ action:'search', admin_key, field, q });
+    if(!(data && data.ok)){
+      setMsg((data && data.error) ? data.error : 'فشل البحث', false);
+      document.getElementById('searchInfo').textContent = '';
+      return;
+    }
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    document.getElementById('searchInfo').textContent = `عدد النتائج: ${items.length}`;
+
+    if(!items.length){
+      tbody.innerHTML = `<tr><td colspan="10" class="muted" style="text-align:center;padding:16px">لا توجد نتائج.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = '';
+    for(const it of items){
+      const rid = esc(it.reg_id);
+      const status = esc(it.status);
+      const score = esc(it.score);
+
+      tbody.insertAdjacentHTML('beforeend', `
+        <tr id="r_${rid}">
+          <td><span class="pill">${rid}</span><div class="row-muted">#${esc(it.serial_no)}</div></td>
+          <td>${esc(it.child_name)}<div class="row-muted">${esc(it.child_civil_id)}</div></td>
+          <td>${esc(it.stage)}</td>
+          <td>${esc(it.gender)}</td>
+          <td>${esc(it.guardian_name)}<div class="row-muted">${esc(it.guardian_civil_id)}</div></td>
+          <td>${esc(it.box_number)}</td>
+          <td>
+            <select id="st_${rid}" class="mini">
+              <option value="">(بدون تغيير)</option>
+              <option value="REGISTERED">REGISTERED</option>
+              <option value="PASSED">PASSED</option>
+              <option value="FAILED">FAILED</option>
+              <option value="SUBMITTED">SUBMITTED</option>
+            </select>
+            <div class="row-muted">الحالي: ${status || '-'}</div>
+          </td>
+          <td>
+            <input id="sc_${rid}" class="mini" value="${score}" placeholder="Score" />
+          </td>
+          <td>
+            ${it.guardian_id_image_url ? `<a class="linkBtn" target="_blank" href="${esc(it.guardian_id_image_url)}">بطاقة ولي الأمر</a>` : ''}
+            ${it.child_id_image_url ? `<a class="linkBtn" target="_blank" href="${esc(it.child_id_image_url)}">بطاقة المتسابق</a>` : ''}
+          </td>
+          <td>
+            <button class="btn-mini" type="button" onclick="saveRow('${rid}')">حفظ</button>
+            <div class="row-muted" id="m_${rid}"></div>
+          </td>
+        </tr>
+      `);
+    }
+
+    // بعد بناء الجدول: اضبط الدروب داون على “بدون تغيير”
+    for(const it of items){
+      const sel = document.getElementById('st_' + it.reg_id);
+      if(sel) sel.value = '';
+    }
 
   }catch(e){
-    setMsg('حصل خطأ أثناء الاتصال. جرّب مرة أخرى.', false);
+    setMsg('حصل خطأ أثناء البحث.', false);
+    document.getElementById('searchInfo').textContent = '';
+  }
+}
+
+async function saveRow(reg_id){
+  setMsg('', true);
+  const admin_key = getAdminKeyOrWarn();
+  if(!admin_key) return;
+
+  const msgEl = document.getElementById('m_' + reg_id);
+  if(msgEl) msgEl.textContent = '...';
+
+  const status = (document.getElementById('st_' + reg_id).value || '').trim();
+  const score = (document.getElementById('sc_' + reg_id).value || '').trim();
+
+  try{
+    const data = await postForm({
+      action:'updateResult',
+      admin_key,
+      reg_id,
+      status,
+      score
+    });
+
+    if(data && data.ok){
+      if(msgEl) msgEl.textContent = 'تم ✅';
+      // حدّث الإحصائيات بسرعة
+      loadStats();
+      return;
+    }
+
+    if(msgEl) msgEl.textContent = (data && data.error) ? data.error : 'فشل';
+  }catch(e){
+    if(msgEl) msgEl.textContent = 'خطأ اتصال';
   }
 }
 
