@@ -95,6 +95,7 @@
   <div class="card">
     <h2>لوحة التحكم (Dashboard)</h2>
     <p class="muted">إحصائيات + عرض الكل + بحث + فلترة + تعديل الدرجات والحالة + تغيير حالة جماعي + PDF + تصدير CSV (Excel)</p>
+   <button type="button" onclick="printAllGuardiansPdf()">طباعة كشف PDF (حسب الصندوق)</button>
 
     <div class="grid">
       <!-- Admin key -->
@@ -721,6 +722,31 @@ async function printCard(reg_id){
   }
 }
 loadSavedKey();
+
+ async function printAllGuardiansPdf(){
+  setMsg('', true);
+  const admin_key = getAdminKeyOrWarn();
+  if(!admin_key) return;
+
+  try{
+    const data = await postForm({
+      action:'guardiansPdf',
+      admin_key
+      // تقدر تبعت stage/gender/status هنا لو عايز كشف مفلتر
+      // stage: document.getElementById('filter_stage').value,
+      // gender: document.getElementById('filter_gender').value,
+    });
+
+    if(data && data.ok && data.url){
+      window.open(data.url, '_blank');
+      setMsg('تم إنشاء كشف PDF ✅', true);
+      return;
+    }
+    setMsg((data && data.error) ? data.error : 'فشل إنشاء كشف PDF', false);
+  }catch(e){
+    setMsg('حصل خطأ أثناء إنشاء كشف PDF.', false);
+  }
+}
 </script>
 </body>
 </html>
