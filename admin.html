@@ -25,6 +25,10 @@
   .btn-secondary:hover{background:#5a52df}
   .btn-dark{background:#263238}
   .btn-dark:hover{background:#1f282c}
+  .btn-gray{background:#9e9e9e}
+  .btn-gray:hover{background:#8a8a8a}
+  .btn-danger{background:#c62828}
+  .btn-danger:hover{background:#a32020}
 
   table{width:100%;border-collapse:collapse;margin-top:12px}
   th,td{border-bottom:1px solid #eee;padding:10px;text-align:right;font-size:14px;vertical-align:top}
@@ -50,14 +54,47 @@
     text-decoration:none;
     color:#111;
     font-size:12px;
+    margin-left:6px;
+    margin-bottom:6px;
+    white-space:nowrap;
   }
+
+  .lockPill{
+    display:inline-block;
+    padding:3px 10px;
+    border-radius:999px;
+    background:#ffe0b2;
+    font-size:12px;
+    color:#8a4b00;
+    font-weight:700;
+  }
+
+  .toolbarLine{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:10px;
+    align-items:center;
+  }
+  .toolbarLine > *{flex:1}
+  .toolbarLine .tight{flex:0.6}
+  .toolbarLine .wide{flex:1.4}
+
+  .pager{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    margin-top:10px;
+    flex-wrap:wrap;
+  }
+  .pager button{width:auto; min-width:160px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="card">
     <h2>لوحة التحكم (Dashboard)</h2>
-    <p class="muted">إحصائيات + بحث + تعديل الحالة والدرجات + تصدير CSV (Excel)</p>
+    <p class="muted">إحصائيات + عرض الكل + بحث + فلترة + تعديل الدرجات والحالة + تغيير حالة جماعي + PDF + تصدير CSV (Excel)</p>
 
     <div class="grid">
       <!-- Admin key -->
@@ -83,6 +120,43 @@
       <div class="stat two"><div class="k">المتوسط (Middle)</div><div class="v" id="st_Middle">—</div></div>
       <div class="stat two"><div class="k">الثانوي (Secondary)</div><div class="v" id="st_Secondary">—</div></div>
 
+      <!-- Filters + View all -->
+      <div class="full">
+        <div class="sectionTitle">عرض الكل + فلترة</div>
+
+        <div class="toolbarLine">
+          <select id="filter_stage" class="mini">
+            <option value="">كل المراحل</option>
+            <option value="KG">KG</option>
+            <option value="Primary">Primary</option>
+            <option value="Middle">Middle</option>
+            <option value="Secondary">Secondary</option>
+          </select>
+
+          <select id="filter_gender" class="mini">
+            <option value="">الكل (نوع)</option>
+            <option value="Boys">Boys</option>
+            <option value="Girls">Girls</option>
+          </select>
+
+          <select id="pageSize" class="mini tight">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+          </select>
+
+          <button class="btn-secondary wide" type="button" onclick="loadAll(1)">عرض كل المسجلين</button>
+        </div>
+
+        <div class="row-muted" id="allInfo"></div>
+
+        <div class="pager" id="pager" style="display:none">
+          <button class="btn-gray" type="button" onclick="prevPage()">السابق</button>
+          <button class="btn-gray" type="button" onclick="nextPage()">التالي</button>
+        </div>
+      </div>
+
       <!-- Search -->
       <div class="full">
         <div class="sectionTitle">بحث</div>
@@ -97,6 +171,23 @@
           <button class="btn-mini btn-secondary" type="button" onclick="doSearch()">بحث</button>
         </div>
         <div class="row-muted" id="searchInfo"></div>
+      </div>
+
+      <!-- Bulk status -->
+      <div class="full">
+        <div class="sectionTitle">تغيير حالة جماعي (على النتائج الحالية)</div>
+        <div class="toolbarLine">
+          <select id="bulk_status" class="mini">
+            <option value="">اختر حالة</option>
+            <option value="REGISTERED">REGISTERED</option>
+            <option value="SUBMITTED">SUBMITTED</option>
+            <option value="PASSED">PASSED</option>
+            <option value="FAILED">FAILED</option>
+            <option value="ABSENT">ABSENT</option>
+          </select>
+          <button class="btn-danger" type="button" onclick="bulkApply()">تطبيق على النتائج</button>
+        </div>
+        <div class="row-muted">ملاحظة: الصفوف المقفولة (locked=TRUE) سيتم تخطيها تلقائيًا.</div>
       </div>
 
       <!-- Last 10 -->
@@ -121,9 +212,9 @@
         </div>
       </div>
 
-      <!-- Search results + edit -->
+      <!-- Results + edit -->
       <div class="full">
-        <div class="sectionTitle">نتائج البحث (تعديل Status / Score)</div>
+        <div class="sectionTitle">النتائج الحالية (تعديل Status / Score + Percent + PDF)</div>
         <div style="overflow:auto;border:1px solid #eee;border-radius:14px">
           <table>
             <thead>
@@ -136,12 +227,15 @@
                 <th>الصندوق</th>
                 <th>Status</th>
                 <th>Score</th>
+                <th>Percent</th>
+                <th>Locked</th>
                 <th>صور</th>
+                <th>PDF</th>
                 <th>حفظ</th>
               </tr>
             </thead>
             <tbody id="searchRows">
-              <tr><td colspan="10" class="muted" style="text-align:center;padding:16px">ابدأ بالبحث لعرض النتائج…</td></tr>
+              <tr><td colspan="13" class="muted" style="text-align:center;padding:16px">اضغط "عرض كل المسجلين" أو ابدأ بالبحث…</td></tr>
             </tbody>
           </table>
         </div>
@@ -153,6 +247,12 @@
 
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbyo4zs3v4Qno0j_p5N-8qV2WR-HFG63nlrWR-F773WKLjj3cnDAg94zu9vVOMYvTngJ/exec";
+
+let CURRENT_MODE = ''; // 'all' | 'search'
+let CURRENT_PAGE = 1;
+let CURRENT_TOTAL = 0;
+let LAST_ITEMS = [];   // آخر نتائج معروضة (للبلك)
+let LAST_SEARCH_META = { field:'', q:'' };
 
 function setMsg(t, ok){
   const m = document.getElementById('msg');
@@ -218,6 +318,14 @@ function getAdminKeyOrWarn(){
   return admin_key;
 }
 
+function getFilters(){
+  return {
+    stage: (document.getElementById('filter_stage').value || '').trim(),
+    gender: (document.getElementById('filter_gender').value || '').trim(),
+    pageSize: Number((document.getElementById('pageSize').value || '50').trim()) || 50
+  };
+}
+
 async function postForm(params){
   const body = new URLSearchParams(params);
   const res = await fetch(API_URL, {
@@ -226,6 +334,12 @@ async function postForm(params){
     body
   });
   return await res.json();
+}
+
+function normalizeItems(data){
+  // متسامح مع: items أو rows
+  const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data?.rows) ? data.rows : []);
+  return items;
 }
 
 async function loadStats(){
@@ -278,6 +392,161 @@ async function exportCsv(){
   }
 }
 
+/** ===========================
+ *  RENDER TABLE
+ *  =========================== */
+function fmtPercent(v){
+  if(v === null || v === undefined || v === '') return '';
+  const n = Number(v);
+  if(isNaN(n)) return String(v);
+  // لو جاي كسر 0.7 => 70%
+  if(n <= 1) return Math.round(n*100) + '%';
+  // لو جاي 70 => 70%
+  return Math.round(n) + '%';
+}
+
+function isLockedVal(v){
+  return String(v||'').trim().toUpperCase() === 'TRUE';
+}
+
+function renderResults(items, infoText){
+  const tbody = document.getElementById('searchRows');
+  LAST_ITEMS = Array.isArray(items) ? items : [];
+
+  if(infoText){
+    document.getElementById('searchInfo').textContent = infoText;
+  }
+
+  if(!LAST_ITEMS.length){
+    tbody.innerHTML = `<tr><td colspan="13" class="muted" style="text-align:center;padding:16px">لا توجد نتائج.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = '';
+  for(const it of LAST_ITEMS){
+    const rid = esc(it.reg_id);
+    const status = esc(it.status);
+    const score = (it.score === null || it.score === undefined) ? '' : esc(it.score);
+    const percent = fmtPercent(it.percent);
+    const locked = isLockedVal(it.locked);
+
+    const lockBadge = locked ? `<span class="lockPill">LOCKED</span>` : `<span class="pill">OPEN</span>`;
+
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr id="r_${rid}">
+        <td><span class="pill">${rid}</span><div class="row-muted">#${esc(it.serial_no||'')}</div></td>
+        <td>${esc(it.child_name||'')}<div class="row-muted">${esc(it.child_civil_id||'')}</div></td>
+        <td>${esc(it.stage||'')}</td>
+        <td>${esc(it.gender||'')}</td>
+        <td>${esc(it.guardian_name||'')}<div class="row-muted">${esc(it.guardian_civil_id||'')}</div></td>
+        <td>${esc(it.box_number||'')}</td>
+
+        <td>
+          <select id="st_${rid}" class="mini" ${locked?'disabled':''}>
+            <option value="">(بدون تغيير)</option>
+            <option value="REGISTERED">REGISTERED</option>
+            <option value="PASSED">PASSED</option>
+            <option value="FAILED">FAILED</option>
+            <option value="SUBMITTED">SUBMITTED</option>
+            <option value="ABSENT">ABSENT</option>
+          </select>
+          <div class="row-muted">الحالي: ${status || '-'}</div>
+        </td>
+
+        <td>
+          <input id="sc_${rid}" class="mini" value="${score}" placeholder="Score" ${locked?'disabled':''} />
+          <div class="row-muted">ملاحظة: لو MAX_SCORE مضبوط، الحالة وpercent هيتحسبوا تلقائيًا.</div>
+        </td>
+
+        <td><span class="pill">${esc(percent)}</span></td>
+        <td>${lockBadge}</td>
+
+        <td>
+          ${it.guardian_id_image_url ? `<a class="linkBtn" target="_blank" href="${esc(it.guardian_id_image_url)}">بطاقة ولي الأمر</a>` : ''}
+          ${it.child_id_image_url ? `<a class="linkBtn" target="_blank" href="${esc(it.child_id_image_url)}">بطاقة المتسابق</a>` : ''}
+        </td>
+
+        <td>
+          <button class="btn-mini btn-dark" type="button" onclick="printCard('${rid}')" ${locked?'':'style="opacity:1"'}>PDF</button>
+        </td>
+
+        <td>
+          <button class="btn-mini" type="button" onclick="saveRow('${rid}')" ${locked?'disabled':''}>حفظ</button>
+          <div class="row-muted" id="m_${rid}">${locked ? 'مقفول (LOCKED)' : ''}</div>
+        </td>
+      </tr>
+    `);
+
+    // اضبط الدروب داون على “بدون تغيير”
+    const sel = document.getElementById('st_' + (it.reg_id||''));
+    if(sel) sel.value = '';
+  }
+}
+
+/** ===========================
+ *  VIEW ALL (listAll)
+ *  =========================== */
+async function loadAll(page){
+  setMsg('', true);
+  const admin_key = getAdminKeyOrWarn();
+  if(!admin_key) return;
+
+  const f = getFilters();
+  CURRENT_MODE = 'all';
+  CURRENT_PAGE = Math.max(Number(page||1), 1);
+
+  document.getElementById('allInfo').textContent = 'جاري تحميل كل المسجلين...';
+  const tbody = document.getElementById('searchRows');
+  tbody.innerHTML = `<tr><td colspan="13" class="muted" style="text-align:center;padding:16px">جاري التحميل...</td></tr>`;
+
+  try{
+    const data = await postForm({
+      action:'listAll',
+      admin_key,
+      page: CURRENT_PAGE,
+      pageSize: f.pageSize,
+      stage: f.stage,
+      gender: f.gender
+    });
+
+    if(!(data && data.ok)){
+      setMsg((data && data.error) ? data.error : 'فشل تحميل الكل', false);
+      document.getElementById('allInfo').textContent = '';
+      document.getElementById('pager').style.display = 'none';
+      return;
+    }
+
+    const items = normalizeItems(data);
+    CURRENT_TOTAL = Number(data.total || data.total_rows || 0);
+
+    const info = `عرض صفحة ${CURRENT_PAGE} — (PageSize: ${f.pageSize}) — إجمالي الصفوف: ${CURRENT_TOTAL}`;
+    document.getElementById('allInfo').textContent = info;
+
+    // pager
+    const canPrev = CURRENT_PAGE > 1;
+    const maxPage = f.pageSize > 0 ? Math.ceil((CURRENT_TOTAL||0) / f.pageSize) : 1;
+    const canNext = CURRENT_PAGE < maxPage;
+
+    const pager = document.getElementById('pager');
+    pager.style.display = (maxPage > 1) ? 'flex' : 'none';
+    pager.querySelectorAll('button')[0].disabled = !canPrev;
+    pager.querySelectorAll('button')[1].disabled = !canNext;
+
+    renderResults(items, '');
+
+  }catch(e){
+    setMsg('حصل خطأ أثناء التحميل.', false);
+    document.getElementById('allInfo').textContent = '';
+    document.getElementById('pager').style.display = 'none';
+  }
+}
+
+function prevPage(){ loadAll(CURRENT_PAGE - 1); }
+function nextPage(){ loadAll(CURRENT_PAGE + 1); }
+
+/** ===========================
+ *  SEARCH
+ *  =========================== */
 async function doSearch(){
   setMsg('', true);
   const admin_key = getAdminKeyOrWarn();
@@ -290,70 +559,35 @@ async function doSearch(){
     return;
   }
 
+  const f = getFilters();
+  CURRENT_MODE = 'search';
+  LAST_SEARCH_META = { field, q };
+
   document.getElementById('searchInfo').textContent = 'جاري البحث...';
   const tbody = document.getElementById('searchRows');
-  tbody.innerHTML = `<tr><td colspan="10" class="muted" style="text-align:center;padding:16px">جاري التحميل...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="13" class="muted" style="text-align:center;padding:16px">جاري التحميل...</td></tr>`;
 
   try{
-    const data = await postForm({ action:'search', admin_key, field, q });
+    // ملاحظة: backend الجديد الأفضل يستخدم q فقط
+    // لكن لو عندك نسخة قديمة تعتمد field/q هنرسلهم الاثنين
+    const data = await postForm({
+      action:'search',
+      admin_key,
+      field,
+      q,
+      stage: f.stage,
+      gender: f.gender
+    });
+
     if(!(data && data.ok)){
       setMsg((data && data.error) ? data.error : 'فشل البحث', false);
       document.getElementById('searchInfo').textContent = '';
       return;
     }
 
-    const items = Array.isArray(data.items) ? data.items : [];
+    const items = normalizeItems(data);
     document.getElementById('searchInfo').textContent = `عدد النتائج: ${items.length}`;
-
-    if(!items.length){
-      tbody.innerHTML = `<tr><td colspan="10" class="muted" style="text-align:center;padding:16px">لا توجد نتائج.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = '';
-    for(const it of items){
-      const rid = esc(it.reg_id);
-      const status = esc(it.status);
-      const score = esc(it.score);
-
-      tbody.insertAdjacentHTML('beforeend', `
-        <tr id="r_${rid}">
-          <td><span class="pill">${rid}</span><div class="row-muted">#${esc(it.serial_no)}</div></td>
-          <td>${esc(it.child_name)}<div class="row-muted">${esc(it.child_civil_id)}</div></td>
-          <td>${esc(it.stage)}</td>
-          <td>${esc(it.gender)}</td>
-          <td>${esc(it.guardian_name)}<div class="row-muted">${esc(it.guardian_civil_id)}</div></td>
-          <td>${esc(it.box_number)}</td>
-          <td>
-            <select id="st_${rid}" class="mini">
-              <option value="">(بدون تغيير)</option>
-              <option value="REGISTERED">REGISTERED</option>
-              <option value="PASSED">PASSED</option>
-              <option value="FAILED">FAILED</option>
-              <option value="SUBMITTED">SUBMITTED</option>
-            </select>
-            <div class="row-muted">الحالي: ${status || '-'}</div>
-          </td>
-          <td>
-            <input id="sc_${rid}" class="mini" value="${score}" placeholder="Score" />
-          </td>
-          <td>
-            ${it.guardian_id_image_url ? `<a class="linkBtn" target="_blank" href="${esc(it.guardian_id_image_url)}">بطاقة ولي الأمر</a>` : ''}
-            ${it.child_id_image_url ? `<a class="linkBtn" target="_blank" href="${esc(it.child_id_image_url)}">بطاقة المتسابق</a>` : ''}
-          </td>
-          <td>
-            <button class="btn-mini" type="button" onclick="saveRow('${rid}')">حفظ</button>
-            <div class="row-muted" id="m_${rid}"></div>
-          </td>
-        </tr>
-      `);
-    }
-
-    // بعد بناء الجدول: اضبط الدروب داون على “بدون تغيير”
-    for(const it of items){
-      const sel = document.getElementById('st_' + it.reg_id);
-      if(sel) sel.value = '';
-    }
+    renderResults(items, `عدد النتائج: ${items.length}`);
 
   }catch(e){
     setMsg('حصل خطأ أثناء البحث.', false);
@@ -361,6 +595,9 @@ async function doSearch(){
   }
 }
 
+/** ===========================
+ *  SAVE ROW (updateResult)
+ *  =========================== */
 async function saveRow(reg_id){
   setMsg('', true);
   const admin_key = getAdminKeyOrWarn();
@@ -369,28 +606,103 @@ async function saveRow(reg_id){
   const msgEl = document.getElementById('m_' + reg_id);
   if(msgEl) msgEl.textContent = '...';
 
-  const status = (document.getElementById('st_' + reg_id).value || '').trim();
-  const score = (document.getElementById('sc_' + reg_id).value || '').trim();
+  const status = (document.getElementById('st_' + reg_id)?.value || '').trim();
+  const score = (document.getElementById('sc_' + reg_id)?.value || '').trim();
 
   try{
     const data = await postForm({
       action:'updateResult',
       admin_key,
       reg_id,
-      status,
+      status, // backend ممكن يتجاهله لو MAX_SCORE مضبوط وscore موجود
       score
     });
 
     if(data && data.ok){
       if(msgEl) msgEl.textContent = 'تم ✅';
-      // حدّث الإحصائيات بسرعة
+
+      // حدّث الإحصائيات
       loadStats();
+
+      // أعِد تحميل نفس الشاشة علشان يظهر percent/locked لو اتغيروا
+      if(CURRENT_MODE === 'all') loadAll(CURRENT_PAGE);
+      else if(CURRENT_MODE === 'search') doSearch();
+
       return;
     }
 
     if(msgEl) msgEl.textContent = (data && data.error) ? data.error : 'فشل';
   }catch(e){
     if(msgEl) msgEl.textContent = 'خطأ اتصال';
+  }
+}
+
+/** ===========================
+ *  BULK UPDATE STATUS
+ *  =========================== */
+async function bulkApply(){
+  setMsg('', true);
+  const admin_key = getAdminKeyOrWarn();
+  if(!admin_key) return;
+
+  const new_status = (document.getElementById('bulk_status').value || '').trim();
+  if(!new_status){
+    setMsg('اختر الحالة الجديدة أولاً.', false);
+    return;
+  }
+
+  if(!Array.isArray(LAST_ITEMS) || !LAST_ITEMS.length){
+    setMsg('لا توجد نتائج حالية لتطبيق التغيير عليها.', false);
+    return;
+  }
+
+  const reg_ids = LAST_ITEMS.map(x => x.reg_id).filter(Boolean);
+
+  try{
+    const data = await postForm({
+      action:'bulkUpdateStatus',
+      admin_key,
+      new_status,
+      reg_ids: JSON.stringify(reg_ids)
+    });
+
+    if(data && data.ok){
+      setMsg(`تم تحديث: ${data.updated} | تم تخطي (locked): ${data.skipped_locked}`, true);
+      loadStats();
+      if(CURRENT_MODE === 'all') loadAll(CURRENT_PAGE);
+      else if(CURRENT_MODE === 'search') doSearch();
+      return;
+    }
+
+    setMsg((data && data.error) ? data.error : 'فشل التحديث الجماعي', false);
+  }catch(e){
+    setMsg('حصل خطأ أثناء التحديث الجماعي.', false);
+  }
+}
+
+/** ===========================
+ *  PRINT CARD PDF
+ *  =========================== */
+async function printCard(reg_id){
+  setMsg('', true);
+  const admin_key = getAdminKeyOrWarn();
+  if(!admin_key) return;
+
+  try{
+    const data = await postForm({
+      action:'printCard',
+      admin_key,
+      reg_id
+    });
+
+    if(data && data.ok && data.pdf_url){
+      window.open(data.pdf_url, '_blank');
+      return;
+    }
+
+    setMsg((data && data.error) ? data.error : 'فشل إنشاء PDF', false);
+  }catch(e){
+    setMsg('حصل خطأ أثناء إنشاء PDF.', false);
   }
 }
 
