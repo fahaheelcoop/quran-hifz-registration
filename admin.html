@@ -684,28 +684,44 @@ async function bulkApply(){
  *  PRINT CARD PDF
  *  =========================== */
 async function printCard(reg_id){
-  setMsg('', true);
+  // تأكيد سريع إن الزر بيستدعي الدالة
+  setMsg('جاري إنشاء PDF ...', true);
+
   const admin_key = getAdminKeyOrWarn();
   if(!admin_key) return;
 
   try{
     const data = await postForm({
-      action:'cardPdf',
+      action: 'cardPdf',   // ✅ تأكد إن دي نفس الأكشن في Code.gs
       admin_key,
       reg_id
     });
 
-    if(data && data.ok && data.pdf_url){
-      window.open(data.pdf_url, '_blank');
+    // لو السيرفر رجّع خطأ
+    if(!data || !data.ok){
+      setMsg((data && data.error) ? data.error : 'فشل إنشاء PDF', false);
       return;
     }
 
-    setMsg((data && data.error) ? data.error : 'فشل إنشاء PDF', false);
+    // بعض النسخ بترجع url وبعضها pdf_url
+    const url = data.pdf_url || data.url;
+    if(!url){
+      setMsg('تم التنفيذ لكن لم يتم إرجاع رابط PDF من السيرفر.', false);
+      return;
+    }
+
+    // بدل window.open (اللي ممكن يتمنع) — افتح في نفس التبويب
+    setMsg('تم إنشاء PDF ✅ جاري الفتح...', true);
+    window.location.href = url;
+
+    // لو تحب يفتح في تبويب جديد (ممكن يتمنع):
+    // const w = window.open(url, '_blank');
+    // if(!w) setMsg('Popup Blocker منع فتح التبويب. اضغط على الرابط: ' + url, false);
+
   }catch(e){
-    setMsg('حصل خطأ أثناء إنشاء PDF.', false);
+    setMsg('خطأ أثناء إنشاء PDF: ' + (e && e.message ? e.message : e), false);
   }
 }
-
 loadSavedKey();
 </script>
 </body>
