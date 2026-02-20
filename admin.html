@@ -95,18 +95,21 @@
   <div class="card">
     <h2>لوحة التحكم (Dashboard)</h2>
     <p class="muted">إحصائيات + عرض الكل + بحث + فلترة + تعديل الدرجات والحالة + تغيير حالة جماعي + PDF + تصدير CSV (Excel)</p>
-   <button type="button" onclick="printAllGuardiansPdf()">طباعة كشف PDF (حسب الصندوق)</button>
 
-    <div class="grid">
-      <!-- Admin key -->
-      <div class="full">
-        <label style="display:block;margin:0 0 8px;font-weight:700">Admin Key</label>
-        <input id="admin_key" placeholder="اكتب المفتاح (ADMIN_KEY)" />
-        <div class="actions" style="margin-top:10px">
-          <button class="btn-secondary" type="button" onclick="loadStats()">تحديث الإحصائيات</button>
-          <button class="btn-dark" type="button" onclick="saveKey()">حفظ المفتاح على الجهاز</button>
-          <button type="button" onclick="exportCsv()">تصدير Excel (CSV)</button>
-        </div>
+<div class="grid">
+  <div class="full">
+    <label style="display:block;margin:0 0 8px;font-weight:700">Admin Key</label>
+    <input id="admin_key" placeholder="اكتب المفتاح (ADMIN_KEY)" />
+    <div class="actions" style="margin-top:10px">
+      <button class="btn-secondary" type="button" onclick="loadStats()">تحديث الإحصائيات</button>
+      <button class="btn-dark" type="button" onclick="saveKey()">حفظ المفتاح على الجهاز</button>
+      <button type="button" onclick="exportCsv()">تصدير Excel (CSV)</button>
+
+      <!-- ✅ الزر الجديد هنا -->
+      <button class="btn-dark" type="button" onclick="printAllGuardiansPdf()">تصدير كشف PDF (حسب الصندوق)</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
         <div class="msg" id="msg"></div>
       </div>
 
