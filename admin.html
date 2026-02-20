@@ -684,7 +684,6 @@ async function bulkApply(){
  *  PRINT CARD PDF
  *  =========================== */
 async function printCard(reg_id){
-  // تأكيد سريع إن الزر بيستدعي الدالة
   setMsg('جاري إنشاء PDF ...', true);
 
   const admin_key = getAdminKeyOrWarn();
@@ -692,34 +691,33 @@ async function printCard(reg_id){
 
   try{
     const data = await postForm({
-      action: 'cardPdf',   // ✅ تأكد إن دي نفس الأكشن في Code.gs
+      action: 'cardPdf',   // خليها cardPdf مؤقتًا (هنثبتها بعد ما نراجع doPost)
       admin_key,
       reg_id
     });
 
-    // لو السيرفر رجّع خطأ
-    if(!data || !data.ok){
-      setMsg((data && data.error) ? data.error : 'فشل إنشاء PDF', false);
+    // ✅ اعرض الرد كله لو فيه مشكلة
+    if(!data){
+      setMsg('لم يصل رد من السيرفر.', false);
       return;
     }
 
-    // بعض النسخ بترجع url وبعضها pdf_url
+    if(!data.ok){
+      setMsg('خطأ من السيرفر: ' + (data.error || JSON.stringify(data)), false);
+      return;
+    }
+
     const url = data.pdf_url || data.url;
     if(!url){
-      setMsg('تم التنفيذ لكن لم يتم إرجاع رابط PDF من السيرفر.', false);
+      setMsg('السيرفر قال OK لكن لم يرجع رابط PDF: ' + JSON.stringify(data), false);
       return;
     }
 
-    // بدل window.open (اللي ممكن يتمنع) — افتح في نفس التبويب
     setMsg('تم إنشاء PDF ✅ جاري الفتح...', true);
     window.location.href = url;
 
-    // لو تحب يفتح في تبويب جديد (ممكن يتمنع):
-    // const w = window.open(url, '_blank');
-    // if(!w) setMsg('Popup Blocker منع فتح التبويب. اضغط على الرابط: ' + url, false);
-
   }catch(e){
-    setMsg('خطأ أثناء إنشاء PDF: ' + (e && e.message ? e.message : e), false);
+    setMsg('خطأ أثناء الاتصال: ' + (e && e.message ? e.message : e), false);
   }
 }
 loadSavedKey();
