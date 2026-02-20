@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>لوحة التحكم - التسجيلات</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Arial,sans-serif;background:#f6f7fb;margin:0;padding:24px}
+  .wrap{max-width:1100px;margin:0 auto}
+  .card{background:#fff;border-radius:16px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+  h2{margin:0 0 14px;text-align:center}
+  .muted{color:#666;text-align:center;margin:0 0 16px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .stat{background:#fafafa;border:1px solid #eee;border-radius:14px;padding:14px}
+  .stat .k{color:#666;font-size:13px;margin-bottom:6px}
+  .stat .v{font-size:22px;font-weight:800}
+  .two{grid-column:span 2}
+  .full{grid-column:1/-1}
+  input,button{width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;font-size:15px}
+  button{border:0;background:#2e7d32;color:#fff;cursor:pointer}
+  button:hover{background:#256628}
+  .btn-secondary{background:#6c63ff}
+  .btn-secondary:hover{background:#5a52df}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  th,td{border-bottom:1px solid #eee;padding:10px;text-align:right;font-size:14px;vertical-align:top}
+  th{background:#fafafa}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:#f1f1f1;font-size:12px}
+  .msg{margin-top:12px;text-align:center;font-weight:700}
+  .err{color:#b00020}
+  .ok{color:#1b5e20}
+  .row-muted{color:#666;font-size:12px;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h2>لوحة التحكم (Dashboard)</h2>
+    <p class="muted">إحصائيات التسجيل + آخر التسجيلات</p>
+
+    <div class="grid">
+      <div class="full">
+        <label style="display:block;margin:0 0 8px;font-weight:700">Admin Key</label>
+        <input id="admin_key" placeholder="اكتب المفتاح (ADMIN_KEY)" />
+        <div style="display:flex;gap:10px;margin-top:10px">
+          <button class="btn-secondary" type="button" onclick="loadStats()">تحديث البيانات</button>
+          <button type="button" onclick="saveKey()">حفظ المفتاح على الجهاز</button>
+        </div>
+        <div class="msg" id="msg"></div>
+      </div>
+
+      <div class="stat"><div class="k">إجمالي الصفوف (التسجيلات)</div><div class="v" id="total_rows">—</div></div>
+      <div class="stat"><div class="k">بنين</div><div class="v" id="boys">—</div></div>
+      <div class="stat"><div class="k">بنات</div><div class="v" id="girls">—</div></div>
+      <div class="stat"><div class="k">الإجمالي (بنين+بنات)</div><div class="v" id="sum_bg">—</div></div>
+
+      <div class="stat two"><div class="k">الروضة (KG)</div><div class="v" id="st_KG">—</div></div>
+      <div class="stat two"><div class="k">الابتدائي (Primary)</div><div class="v" id="st_Primary">—</div></div>
+      <div class="stat two"><div class="k">المتوسط (Middle)</div><div class="v" id="st_Middle">—</div></div>
+      <div class="stat two"><div class="k">الثانوي (Secondary)</div><div class="v" id="st_Secondary">—</div></div>
+
+      <div class="full">
+        <h3 style="margin:10px 0 0">آخر 10 تسجيلات</h3>
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>الوقت</th>
+                <th>Reg ID</th>
+                <th>ولي الأمر</th>
+                <th>الصندوق</th>
+                <th>المتسابق</th>
+                <th>المرحلة</th>
+                <th>النوع</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="lastRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbyo4zs3v4Qno0j_p5N-8qV2WR-HFG63nlrWR-F773WKLjj3cnDAg94zu9vVOMYvTngJ/exec";
+
+function setMsg(t, ok){
+  const m = document.getElementById('msg');
+  m.textContent = t || '';
+  m.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+function saveKey(){
+  const k = (document.getElementById('admin_key').value || '').trim();
+  localStorage.setItem('QH_ADMIN_KEY', k);
+  setMsg('تم حفظ المفتاح على هذا الجهاز ✅', true);
+}
+
+function loadSavedKey(){
+  const k = localStorage.getItem('QH_ADMIN_KEY') || '';
+  document.getElementById('admin_key').value = k;
+}
+
+function esc(s){
+  return String(s || '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function fillStats(data){
+  document.getElementById('total_rows').textContent = data.total_rows ?? '0';
+  document.getElementById('boys').textContent = data.boys ?? '0';
+  document.getElementById('girls').textContent = data.girls ?? '0';
+  document.getElementById('sum_bg').textContent =
+    (Number(data.boys||0) + Number(data.girls||0)).toString();
+
+  const st = data.by_stage || {};
+  document.getElementById('st_KG').textContent = st.KG ?? '0';
+  document.getElementById('st_Primary').textContent = st.Primary ?? '0';
+  document.getElementById('st_Middle').textContent = st.Middle ?? '0';
+  document.getElementById('st_Secondary').textContent = st.Secondary ?? '0';
+
+  const tbody = document.getElementById('lastRows');
+  tbody.innerHTML = '';
+  const rows = Array.isArray(data.last) ? data.last : [];
+  for(const r of rows){
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${esc(r.created_at)}</td>
+        <td><span class="pill">${esc(r.reg_id)}</span></td>
+        <td>${esc(r.guardian_name)}<div class="row-muted">${esc(r.guardian_civil_id)}</div></td>
+        <td>${esc(r.box_number)}</td>
+        <td>${esc(r.child_name)}<div class="row-muted">${esc(r.child_civil_id)}</div></td>
+        <td>${esc(r.stage)}</td>
+        <td>${esc(r.gender)}</td>
+        <td>${esc(r.status)}</td>
+      </tr>
+    `);
+  }
+}
+
+async function loadStats(){
+  setMsg('', true);
+
+  const admin_key = (document.getElementById('admin_key').value || '').trim();
+  if(!admin_key){
+    setMsg('اكتب Admin Key الأول.', false);
+    return;
+  }
+
+  const body = new URLSearchParams({
+    action: 'getStats',
+    admin_key
+  });
+
+  try{
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+      body
+    });
+
+    const data = await res.json();
+
+    if(data && data.ok){
+      fillStats(data);
+      setMsg('تم تحديث البيانات ✅', true);
+      return;
+    }
+
+    setMsg((data && data.error) ? data.error : 'فشل تحميل البيانات', false);
+
+  }catch(e){
+    setMsg('حصل خطأ أثناء الاتصال. جرّب مرة أخرى.', false);
+  }
+}
+
+loadSavedKey();
+</script>
+</body>
+</html>
