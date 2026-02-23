@@ -88,6 +88,20 @@
     flex-wrap:wrap;
   }
   .pager button{width:auto; min-width:160px}
+
+  /* ✅ عرض روابط ملفات PDF المتعددة */
+  .pdfLinksWrap{
+    margin-top:10px;
+    padding:10px;
+    border:1px dashed #ddd;
+    border-radius:12px;
+    background:#fafafa;
+  }
+  .pdfLinksTitle{
+    font-weight:800;
+    margin-bottom:8px;
+    color:#111;
+  }
 </style>
 </head>
 <body>
@@ -96,21 +110,25 @@
     <h2>لوحة التحكم (Dashboard)</h2>
     <p class="muted">إحصائيات + عرض الكل + بحث + فلترة + تعديل الدرجات والحالة + تغيير حالة جماعي + PDF + تصدير CSV (Excel)</p>
 
-<div class="grid">
-  <div class="full">
-    <label style="display:block;margin:0 0 8px;font-weight:700">Admin Key</label>
-    <input id="admin_key" placeholder="اكتب المفتاح (ADMIN_KEY)" />
-    <div class="actions" style="margin-top:10px">
-      <button class="btn-secondary" type="button" onclick="loadStats()">تحديث الإحصائيات</button>
-      <button class="btn-dark" type="button" onclick="saveKey()">حفظ المفتاح على الجهاز</button>
-      <button type="button" onclick="exportCsv()">تصدير Excel (CSV)</button>
+    <div class="grid">
 
-      <!-- ✅ الزر الجديد هنا -->
-      <button class="btn-dark" type="button" onclick="printAllGuardiansPdf()">تصدير كشف PDF (حسب الصندوق)</button>
-    </div>
-    <div class="msg" id="msg"></div>
-  </div>
+      <div class="full">
+        <label style="display:block;margin:0 0 8px;font-weight:700">Admin Key</label>
+        <input id="admin_key" placeholder="اكتب المفتاح (ADMIN_KEY)" />
+        <div class="actions" style="margin-top:10px">
+          <button class="btn-secondary" type="button" onclick="loadStats()">تحديث الإحصائيات</button>
+          <button class="btn-dark" type="button" onclick="saveKey()">حفظ المفتاح على الجهاز</button>
+          <button type="button" onclick="exportCsv()">تصدير Excel (CSV)</button>
+
+          <!-- ✅ الزر هنا -->
+          <button class="btn-dark" type="button" onclick="printAllGuardiansPdf()">تصدير كشف PDF (حسب الصندوق)</button>
+        </div>
+
+        <!-- ✅ رسالة عامة -->
         <div class="msg" id="msg"></div>
+
+        <!-- ✅ هنا هنحط روابط الـ PDF لما تكون متعددة -->
+        <div id="pdfLinks" style="display:none" class="pdfLinksWrap"></div>
       </div>
 
       <!-- stats -->
@@ -255,13 +273,41 @@ const API_URL = "https://script.google.com/macros/s/AKfycbyo4zs3v4Qno0j_p5N-8qV2
 let CURRENT_MODE = ''; // 'all' | 'search'
 let CURRENT_PAGE = 1;
 let CURRENT_TOTAL = 0;
-let LAST_ITEMS = [];   // آخر نتائج معروضة (للبلك)
+let LAST_ITEMS = [];
 let LAST_SEARCH_META = { field:'', q:'' };
 
 function setMsg(t, ok){
   const m = document.getElementById('msg');
   m.textContent = t || '';
   m.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+function hidePdfLinks(){
+  const box = document.getElementById('pdfLinks');
+  box.style.display = 'none';
+  box.innerHTML = '';
+}
+
+function showPdfLinks(files){
+  const box = document.getElementById('pdfLinks');
+  if(!Array.isArray(files) || !files.length){
+    hidePdfLinks();
+    return;
+  }
+
+  box.style.display = 'block';
+  const linksHtml = files.map(f => {
+    const name = esc(f.name || 'PDF');
+    const url = esc(f.url || '');
+    if(!url) return '';
+    return `<a class="linkBtn" target="_blank" href="${url}">${name}</a>`;
+  }).join(' ');
+
+  box.innerHTML = `
+    <div class="pdfLinksTitle">روابط ملفات الـ PDF:</div>
+    <div>${linksHtml}</div>
+    <div class="row-muted" style="margin-top:8px">لو المتصفح منع فتح نوافذ تلقائيًا، افتح أي رابط يدويًا.</div>
+  `;
 }
 
 function saveKey(){
@@ -341,12 +387,12 @@ async function postForm(params){
 }
 
 function normalizeItems(data){
-  // متسامح مع: items أو rows
   const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data?.rows) ? data.rows : []);
   return items;
 }
 
 async function loadStats(){
+  hidePdfLinks();
   setMsg('', true);
   const admin_key = getAdminKeyOrWarn();
   if(!admin_key) return;
@@ -365,6 +411,7 @@ async function loadStats(){
 }
 
 async function exportCsv(){
+  hidePdfLinks();
   setMsg('', true);
   const admin_key = getAdminKeyOrWarn();
   if(!admin_key) return;
@@ -403,9 +450,7 @@ function fmtPercent(v){
   if(v === null || v === undefined || v === '') return '';
   const n = Number(v);
   if(isNaN(n)) return String(v);
-  // لو جاي كسر 0.7 => 70%
   if(n <= 1) return Math.round(n*100) + '%';
-  // لو جاي 70 => 70%
   return Math.round(n) + '%';
 }
 
@@ -471,7 +516,7 @@ function renderResults(items, infoText){
         </td>
 
         <td>
-          <button class="btn-mini btn-dark" type="button" onclick="printCard('${rid}')" ${locked?'':'style="opacity:1"'}>PDF</button>
+          <button class="btn-mini btn-dark" type="button" onclick="printCard('${rid}')">PDF</button>
         </td>
 
         <td>
@@ -481,7 +526,6 @@ function renderResults(items, infoText){
       </tr>
     `);
 
-    // اضبط الدروب داون على “بدون تغيير”
     const sel = document.getElementById('st_' + (it.reg_id||''));
     if(sel) sel.value = '';
   }
@@ -491,6 +535,7 @@ function renderResults(items, infoText){
  *  VIEW ALL (listAll)
  *  =========================== */
 async function loadAll(page){
+  hidePdfLinks();
   setMsg('', true);
   const admin_key = getAdminKeyOrWarn();
   if(!admin_key) return;
@@ -526,15 +571,11 @@ async function loadAll(page){
     const info = `عرض صفحة ${CURRENT_PAGE} — (PageSize: ${f.pageSize}) — إجمالي الصفوف: ${CURRENT_TOTAL}`;
     document.getElementById('allInfo').textContent = info;
 
-    // pager
-    const canPrev = CURRENT_PAGE > 1;
     const maxPage = f.pageSize > 0 ? Math.ceil((CURRENT_TOTAL||0) / f.pageSize) : 1;
-    const canNext = CURRENT_PAGE < maxPage;
-
     const pager = document.getElementById('pager');
     pager.style.display = (maxPage > 1) ? 'flex' : 'none';
-    pager.querySelectorAll('button')[0].disabled = !canPrev;
-    pager.querySelectorAll('button')[1].disabled = !canNext;
+    pager.querySelectorAll('button')[0].disabled = !(CURRENT_PAGE > 1);
+    pager.querySelectorAll('button')[1].disabled = !(CURRENT_PAGE < maxPage);
 
     renderResults(items, '');
 
@@ -552,6 +593,7 @@ function nextPage(){ loadAll(CURRENT_PAGE + 1); }
  *  SEARCH
  *  =========================== */
 async function doSearch(){
+  hidePdfLinks();
   setMsg('', true);
   const admin_key = getAdminKeyOrWarn();
   if(!admin_key) return;
@@ -572,8 +614,6 @@ async function doSearch(){
   tbody.innerHTML = `<tr><td colspan="13" class="muted" style="text-align:center;padding:16px">جاري التحميل...</td></tr>`;
 
   try{
-    // ملاحظة: backend الجديد الأفضل يستخدم q فقط
-    // لكن لو عندك نسخة قديمة تعتمد field/q هنرسلهم الاثنين
     const data = await postForm({
       action:'search',
       admin_key,
@@ -603,6 +643,7 @@ async function doSearch(){
  *  SAVE ROW (updateResult)
  *  =========================== */
 async function saveRow(reg_id){
+  hidePdfLinks();
   setMsg('', true);
   const admin_key = getAdminKeyOrWarn();
   if(!admin_key) return;
@@ -618,20 +659,15 @@ async function saveRow(reg_id){
       action:'updateResult',
       admin_key,
       reg_id,
-      status, // backend ممكن يتجاهله لو MAX_SCORE مضبوط وscore موجود
+      status,
       score
     });
 
     if(data && data.ok){
       if(msgEl) msgEl.textContent = 'تم ✅';
-
-      // حدّث الإحصائيات
       loadStats();
-
-      // أعِد تحميل نفس الشاشة علشان يظهر percent/locked لو اتغيروا
       if(CURRENT_MODE === 'all') loadAll(CURRENT_PAGE);
       else if(CURRENT_MODE === 'search') doSearch();
-
       return;
     }
 
@@ -645,6 +681,7 @@ async function saveRow(reg_id){
  *  BULK UPDATE STATUS
  *  =========================== */
 async function bulkApply(){
+  hidePdfLinks();
   setMsg('', true);
   const admin_key = getAdminKeyOrWarn();
   if(!admin_key) return;
@@ -688,6 +725,7 @@ async function bulkApply(){
  *  PRINT CARD PDF
  *  =========================== */
 async function printCard(reg_id){
+  hidePdfLinks();
   setMsg('جاري إنشاء PDF ...', true);
 
   const admin_key = getAdminKeyOrWarn();
@@ -695,12 +733,11 @@ async function printCard(reg_id){
 
   try{
     const data = await postForm({
-      action: 'cardPdf',   // خليها cardPdf مؤقتًا (هنثبتها بعد ما نراجع doPost)
+      action: 'cardPdf',
       admin_key,
       reg_id
     });
 
-    // ✅ اعرض الرد كله لو فيه مشكلة
     if(!data){
       setMsg('لم يصل رد من السيرفر.', false);
       return;
@@ -724,10 +761,14 @@ async function printCard(reg_id){
     setMsg('خطأ أثناء الاتصال: ' + (e && e.message ? e.message : e), false);
   }
 }
-loadSavedKey();
 
- async function printAllGuardiansPdf(){
-  setMsg('', true);
+/** ===========================
+ *  ✅ GUARDIANS PDF (single OR multi)
+ *  =========================== */
+async function printAllGuardiansPdf(){
+  hidePdfLinks();
+  setMsg('جاري تجهيز كشف PDF ...', true);
+
   const admin_key = getAdminKeyOrWarn();
   if(!admin_key) return;
 
@@ -735,21 +776,48 @@ loadSavedKey();
     const data = await postForm({
       action:'guardiansPdf',
       admin_key
-      // تقدر تبعت stage/gender/status هنا لو عايز كشف مفلتر
-      // stage: document.getElementById('filter_stage').value,
-      // gender: document.getElementById('filter_gender').value,
+      // stage / gender / status (اختياري)
     });
 
-    if(data && data.ok && data.url){
-      window.open(data.url, '_blank');
+    if(!data){
+      setMsg('لم يصل رد من السيرفر.', false);
+      return;
+    }
+
+    if(!data.ok){
+      setMsg((data && data.error) ? data.error : 'فشل إنشاء كشف PDF', false);
+      return;
+    }
+
+    // ✅ حالة ملفات متعددة
+    if(data.multi === true){
+      const files = Array.isArray(data.files) ? data.files : [];
+      if(!files.length){
+        setMsg('تم التنفيذ لكن لم يرجع السيرفر روابط ملفات (files) ❌', false);
+        return;
+      }
+      showPdfLinks(files);
+      setMsg(`تم إنشاء ${files.length} ملف PDF ✅`, true);
+      return;
+    }
+
+    // ✅ حالة ملف واحد
+    const url = data.url;
+    if(url){
+      // افتح في تبويب جديد
+      window.open(url, '_blank');
       setMsg('تم إنشاء كشف PDF ✅', true);
       return;
     }
-    setMsg((data && data.error) ? data.error : 'فشل إنشاء كشف PDF', false);
+
+    setMsg('تم التنفيذ لكن لم يرجع رابط (url) ❌', false);
+
   }catch(e){
     setMsg('حصل خطأ أثناء إنشاء كشف PDF.', false);
   }
 }
+
+loadSavedKey();
 </script>
 </body>
 </html>
