@@ -766,7 +766,7 @@ async function printCard(reg_id){
  *  ✅ GUARDIANS PDF (single OR multi)
  *  =========================== */
 async function printAllGuardiansPdf(){
-  hidePdfLinks();
+  hidePdfLinks?.();
   setMsg('جاري تجهيز كشف PDF ...', true);
 
   const admin_key = getAdminKeyOrWarn();
@@ -776,8 +776,10 @@ async function printAllGuardiansPdf(){
     const data = await postForm({
       action:'guardiansPdf',
       admin_key
-      // stage / gender / status (اختياري)
     });
+
+    // ✅ أهم سطر: اعرض الرد كامل
+    console.log('guardiansPdf response:', data);
 
     if(!data){
       setMsg('لم يصل رد من السيرفر.', false);
@@ -785,35 +787,42 @@ async function printAllGuardiansPdf(){
     }
 
     if(!data.ok){
-      setMsg((data && data.error) ? data.error : 'فشل إنشاء كشف PDF', false);
+      setMsg((data.error || 'فشل') + ' | RAW=' + JSON.stringify(data), false);
       return;
     }
 
-    // ✅ حالة ملفات متعددة
+    // ✅ multi
     if(data.multi === true){
       const files = Array.isArray(data.files) ? data.files : [];
       if(!files.length){
-        setMsg('تم التنفيذ لكن لم يرجع السيرفر روابط ملفات (files) ❌', false);
+        setMsg('OK لكن files فاضية | RAW=' + JSON.stringify(data), false);
         return;
       }
-      showPdfLinks(files);
+
+      // عرض روابط
+      if(typeof showPdfLinks === 'function') showPdfLinks(files);
+      else {
+        // fallback بسيط لو showPdfLinks مش موجودة
+        const html = files.map(f => `<a class="linkBtn" target="_blank" href="${esc(f.url)}">${esc(f.name||'PDF')}</a>`).join(' ');
+        const box = document.getElementById('pdfLinks');
+        if(box){ box.style.display='block'; box.innerHTML = html; }
+      }
+
       setMsg(`تم إنشاء ${files.length} ملف PDF ✅`, true);
       return;
     }
 
-    // ✅ حالة ملف واحد
-    const url = data.url;
-    if(url){
-      // افتح في تبويب جديد
-      window.open(url, '_blank');
+    // ✅ single
+    if(data.url){
+      window.open(data.url, '_blank');
       setMsg('تم إنشاء كشف PDF ✅', true);
       return;
     }
 
-    setMsg('تم التنفيذ لكن لم يرجع رابط (url) ❌', false);
+    setMsg('OK لكن لا يوجد url ولا files | RAW=' + JSON.stringify(data), false);
 
   }catch(e){
-    setMsg('حصل خطأ أثناء إنشاء كشف PDF.', false);
+    setMsg('حصل خطأ أثناء إنشاء كشف PDF: ' + (e?.message || e), false);
   }
 }
 
