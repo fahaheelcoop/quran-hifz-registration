@@ -92,12 +92,13 @@ function getQS(){
   };
 }
 
+/* ✅ تعديل بسيط: زر الحذف بدون onclick وبـ data-remove */
 function childTemplate(i){
   return `
     <div class="child-card" id="child_${i}">
       <div class="child-head">
-        <h3>بيانات المتسابق #${i+1}</h3>
-        <button class="danger" type="button" onclick="removeChild(${i})">حذف</button>
+        <h3 class="childTitle">بيانات المتسابق</h3>
+        <button class="danger jsRemoveChild" type="button" data-remove="${i}">حذف</button>
       </div>
 
       <div class="grid" style="margin-top:10px">
@@ -145,13 +146,39 @@ function addChild(){
   const wrap = document.getElementById('childrenWrap');
   wrap.insertAdjacentHTML('beforeend', childTemplate(childIndex));
   childIndex++;
+  renumberChildren_();     // ✅ تحديث العناوين بعد الإضافة
   refreshSubmitState();
 }
 
-function removeChild(i){
-  const el = document.getElementById('child_' + i);
+/* ✅ removeChild أصبحت تقبل رقم أو element */
+function removeChild(iOrEl){
+  const el = (typeof iOrEl === 'number' || typeof iOrEl === 'string')
+    ? document.getElementById('child_' + iOrEl)
+    : iOrEl;
+
   if(el) el.remove();
+
+  renumberChildren_();     // ✅ تحديث العناوين بعد الحذف
   refreshSubmitState();
+}
+
+/* ✅ Listener واحد يضمن الحذف حتى لو فيه بيانات أو لأ */
+document.getElementById('childrenWrap').addEventListener('click', (e) => {
+  const btn = e.target.closest('.jsRemoveChild');
+  if(!btn) return;
+
+  const card = btn.closest('.child-card');
+  if(card) removeChild(card);
+});
+
+/* ✅ إعادة ترقيم العناوين فقط (بدون لمس IDs) */
+function renumberChildren_(){
+  const wrap = document.getElementById('childrenWrap');
+  const cards = wrap.querySelectorAll('.child-card');
+  cards.forEach((card, idx) => {
+    const h = card.querySelector('.childTitle');
+    if(h) h.textContent = `بيانات المتسابق #${idx + 1}`;
+  });
 }
 
 function readAsDataURL_(blob){
