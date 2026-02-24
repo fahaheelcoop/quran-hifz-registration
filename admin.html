@@ -376,14 +376,44 @@ function getFilters(){
   };
 }
 
+/**
+ * ✅ postForm (FIXED)
+ * - يمنع "Failed to fetch" قدر الإمكان:
+ *   1) يرسل كـ x-www-form-urlencoded (بدون JSON)
+ *   2) يقرأ الرد كنص ثم يحاول JSON (عشان لو رجع HTML/خطأ)
+ *   3) يطلع رسالة HTTP status لو غير 200
+ */
 async function postForm(params){
-  const body = new URLSearchParams(params);
-  const res = await fetch(API_URL, {
-    method:'POST',
-    headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
-    body
-  });
-  return await res.json();
+  const body = new URLSearchParams(params).toString();
+
+  let res;
+  try{
+    res = await fetch(API_URL, {
+      method:'POST',
+      headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+      body
+    });
+  }catch(err){
+    // خطأ شبكة/CORS
+    throw new Error('Failed to fetch (Network/CORS) — تأكد إن Web App منشور "Anyone" والرابط صحيح.');
+  }
+
+  const text = await res.text();
+  let data = null;
+
+  try{
+    data = JSON.parse(text);
+  }catch(_){
+    // لو رجع HTML (خطأ نشر/صلاحيات)
+    data = { ok:false, error:'Non-JSON response from server', raw:text };
+  }
+
+  if(!res.ok){
+    const msg = (data && (data.error || data.message)) ? (data.error || data.message) : text;
+    throw new Error(`HTTP ${res.status}: ${msg}`);
+  }
+
+  return data;
 }
 
 function normalizeItems(data){
@@ -406,7 +436,7 @@ async function loadStats(){
     }
     setMsg((data && data.error) ? data.error : 'فشل تحميل البيانات', false);
   }catch(e){
-    setMsg('حصل خطأ أثناء الاتصال. جرّب مرة أخرى.', false);
+    setMsg(String(e && e.message ? e.message : e), false);
   }
 }
 
@@ -417,7 +447,14 @@ async function exportCsv(){
   if(!admin_key) return;
 
   try{
-    const data = await postForm({ action:'exportCsv', admin_key });
+    const f = getFilters();
+    const data = await postForm({
+      action:'exportCsv',
+      admin_key,
+      stage: f.stage,
+      gender: f.gender
+    });
+
     if(!(data && data.ok)){
       setMsg((data && data.error) ? data.error : 'فشل التصدير', false);
       return;
@@ -439,7 +476,7 @@ async function exportCsv(){
 
     setMsg('تم تصدير الملف ✅', true);
   }catch(e){
-    setMsg('حصل خطأ أثناء التصدير.', false);
+    setMsg(String(e && e.message ? e.message : e), false);
   }
 }
 
@@ -580,7 +617,7 @@ async function loadAll(page){
     renderResults(items, '');
 
   }catch(e){
-    setMsg('حصل خطأ أثناء التحميل.', false);
+    setMsg(String(e && e.message ? e.message : e), false);
     document.getElementById('allInfo').textContent = '';
     document.getElementById('pager').style.display = 'none';
   }
@@ -634,7 +671,7 @@ async function doSearch(){
     renderResults(items, `عدد النتائج: ${items.length}`);
 
   }catch(e){
-    setMsg('حصل خطأ أثناء البحث.', false);
+    setMsg(String(e && e.message ? e.message : e), false);
     document.getElementById('searchInfo').textContent = '';
   }
 }
@@ -673,7 +710,7 @@ async function saveRow(reg_id){
 
     if(msgEl) msgEl.textContent = (data && data.error) ? data.error : 'فشل';
   }catch(e){
-    if(msgEl) msgEl.textContent = 'خطأ اتصال';
+    if(msgEl) msgEl.textContent = String(e && e.message ? e.message : e);
   }
 }
 
@@ -700,10 +737,14 @@ async function bulkApply(){
   const reg_ids = LAST_ITEMS.map(x => x.reg_id).filter(Boolean);
 
   try{
+    // ✅ FIX: السيرفر متوقع status_to مش new_status
+    const f = getFilters();
     const data = await postForm({
       action:'bulkUpdateStatus',
       admin_key,
-      new_status,
+      status_to: new_status,
+      stage: f.stage,
+      gender: f.gender,
       reg_ids: JSON.stringify(reg_ids)
     });
 
@@ -717,7 +758,7 @@ async function bulkApply(){
 
     setMsg((data && data.error) ? data.error : 'فشل التحديث الجماعي', false);
   }catch(e){
-    setMsg('حصل خطأ أثناء التحديث الجماعي.', false);
+    setMsg(String(e && e.message ? e.message : e), false);
   }
 }
 
@@ -766,19 +807,23 @@ async function printCard(reg_id){
  *  ✅ GUARDIANS PDF (single OR multi)
  *  =========================== */
 async function printAllGuardiansPdf(){
-  hidePdfLinks?.();
+  hidePdfLinks();
   setMsg('جاري تجهيز كشف PDF ...', true);
 
   const admin_key = getAdminKeyOrWarn();
   if(!admin_key) return;
 
+  // ✅ خذ نفس الفلاتر الحالية (Stage/Gender) + اختياري Status لو حبيت تضيفه لاحقًا
+  const f = getFilters();
+
   try{
     const data = await postForm({
       action:'guardiansPdf',
-      admin_key
+      admin_key,
+      stage: f.stage,
+      gender: f.gender
     });
 
-    // ✅ أهم سطر: اعرض الرد كامل
     console.log('guardiansPdf response:', data);
 
     if(!data){
@@ -799,15 +844,7 @@ async function printAllGuardiansPdf(){
         return;
       }
 
-      // عرض روابط
-      if(typeof showPdfLinks === 'function') showPdfLinks(files);
-      else {
-        // fallback بسيط لو showPdfLinks مش موجودة
-        const html = files.map(f => `<a class="linkBtn" target="_blank" href="${esc(f.url)}">${esc(f.name||'PDF')}</a>`).join(' ');
-        const box = document.getElementById('pdfLinks');
-        if(box){ box.style.display='block'; box.innerHTML = html; }
-      }
-
+      showPdfLinks(files);
       setMsg(`تم إنشاء ${files.length} ملف PDF ✅`, true);
       return;
     }
